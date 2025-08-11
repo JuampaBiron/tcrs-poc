@@ -2,6 +2,7 @@
 
 import { useMemo } from "react"
 import { Eye, CheckCircle, XCircle, Clock, User, Calendar, DollarSign } from "lucide-react"
+import { FilterState } from "./search-filters"
 
 interface Request {
   id: string
@@ -18,14 +19,14 @@ interface RequestsTableProps {
   userRole?: 'requester' | 'approver' | 'admin'
   requests: Request[]
   searchQuery?: string
-  filters?: Record<string, string>
+  filters?: FilterState  
 }
 
 export default function RequestsTable({ 
   userRole = 'requester',
   requests = [],
   searchQuery = "",
-  filters = {}
+  filters = { status: "", dateRange: "", amount: "", branch: "" }
 }: RequestsTableProps) {
 
   const getStatusBadge = (status: Request['status']) => {
@@ -99,7 +100,7 @@ export default function RequestsTable({
       })
       
       if (response.ok) {
-        // Refresh the page to show updated data  
+        // Refresh the page to show updated data
         window.location.reload()
       }
     } catch (error) {
