@@ -1,9 +1,9 @@
 import { auth } from "@/auth"
-import SignInButton from "@/components/landing/sign-in-button"
-import SignOutButton from "@/components/landing/sign-out-button"
-import UserProfile from "@/components/landing/user-profile"
-import FinningLogo from "@/components/landing/finning-logo"
-import BackgroundImage from "@/components/landing/background-image"
+import SignInButton from "@/components/login-page/sign-in-button"
+import SignOutButton from "@/components/login-page/sign-out-button"
+import UserProfile from "@/components/login-page/user-profile"
+import FinningLogo from "@/components/login-page/finning-logo"
+import BackgroundImage from "@/components/login-page/background-image"
 
 export default async function Home() {
   const session = await auth()
@@ -104,7 +104,7 @@ export default async function Home() {
               <div className="space-y-8">
                 <div className="text-center mb-10">
                   <h2 className="text-4xl font-bold text-gray-900 mb-4">
-                    Welcome Back! 🎉
+                    Welcome Back! 
                   </h2>
                   <p className="text-gray-600 text-lg">
                     Successfully authenticated
