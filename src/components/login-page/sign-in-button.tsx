@@ -9,7 +9,7 @@ export default function SignInButton() {
   const handleSignIn = async () => {
     setIsConnecting(true)
     try {
-      await signIn("microsoft-entra-id")
+      await signIn("microsoft-entra-id", { callbackUrl: "/dashboard" })
     } catch (error) {
       setIsConnecting(false)
     }
