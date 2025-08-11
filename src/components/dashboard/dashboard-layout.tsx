@@ -1,38 +1,97 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { User } from "next-auth"
 import StatsCards from "./stats-cards"
-import SearchFilters from "./search-filters" 
+import SearchFilters, { FilterState } from "./search-filters"  
 import RequestsTable from "./requests-table"
 import CreateRequestButton from "./create-request-button"
 import FinningLogo from "../login-page/finning-logo"
 import SignOutButton from "../login-page/sign-out-button"
 import { Settings, Bell, HelpCircle, Menu, X } from "lucide-react"
+import { getUserRole, getRoleDisplayName } from "@/lib/auth-utils"
 
 interface DashboardLayoutProps {
   user: User
 }
 
+type UserRole = 'requester' | 'approver' | 'admin'
+
+
+
 export default function DashboardLayout({ user }: DashboardLayoutProps) {
   const [searchQuery, setSearchQuery] = useState("")
-  const [filters, setFilters] = useState({})
+  const [filters, setFilters] = useState<FilterState>({  
+    status: "",
+    dateRange: "",
+    amount: "",
+    branch: ""
+  })
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [requests, setRequests] = useState([])
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, rejected: 0 })
+  const [loading, setLoading] = useState(true)
 
-  // Mock user role - esto vendría de la sesión/base de datos
-  const [userRole] = useState<'requester' | 'approver' | 'admin'>('requester')
+  // Get user role from email
+  const userRole = getUserRole(user)
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchDashboardData()
+  }, [userRole, user.email])
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true)
+      
+      // Fetch requests based on user role
+      const requestsResponse = await fetch(`/api/requests?role=${userRole}&email=${user.email}`)
+      const requestsData = await requestsResponse.json()
+      
+      // Fetch stats based on user role  
+      const statsResponse = await fetch(`/api/stats?role=${userRole}&email=${user.email}`)
+      const statsData = await statsResponse.json()
+      
+      setRequests(requestsData.requests || [])
+      setStats(statsData.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+      
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error)
+      // Fallback to empty data
+      setRequests([])
+      setStats({ total: 0, pending: 0, approved: 0, rejected: 0 })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSearch = (query: string) => {
     setSearchQuery(query)
   }
 
-  const handleFilterChange = (newFilters: any) => {
+  const handleFilterChange = (newFilters: FilterState) => { 
     setFilters(newFilters)
   }
 
-  const handleExport = () => {
-    // TODO: Export current view to Excel
-    console.log('Exporting current view...')
+  const handleExport = async () => {
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: userRole, email: user.email, filters })
+      })
+      
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `tcrs-requests-${new Date().toISOString().split('T')[0]}.xlsx`
+        a.click()
+      }
+    } catch (error) {
+      console.error('Export failed:', error)
+    }
   }
 
   const handleCreateRequest = () => {
@@ -40,13 +99,15 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     console.log('Navigate to create request form')
   }
 
-  const getRoleDisplayName = (role: string) => {
-    const roleNames = {
-      'requester': 'Requester',
-      'approver': 'Approver', 
-      'admin': 'Administrator'
-    }
-    return roleNames[role as keyof typeof roleNames] || 'User'
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -138,17 +199,17 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
             </h2>
             <p className="text-black/80">
               {userRole === 'approver' 
-                ? 'You have pending requests waiting for your review.'
+                ? `You have ${stats.pending} pending requests waiting for your review.`
                 : userRole === 'admin'
-                ? 'System overview and administration tools are ready.'
-                : 'Ready to submit your invoice approval requests.'
+                ? `System overview: ${stats.total} total requests this period.`
+                : `You have ${stats.pending} requests pending approval.`
               }
             </p>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <StatsCards userRole={userRole} />
+        {/* Stats Cards - Real Data */}
+        <StatsCards userRole={userRole} stats={stats} />
 
         {/* Create Request Button */}
         <div className="mb-8">
@@ -166,9 +227,10 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
           userRole={userRole}
         />
 
-        {/* Requests Table */}
+        {/* Requests Table - Real Data */}
         <RequestsTable 
           userRole={userRole}
+          requests={requests}
           searchQuery={searchQuery}
           filters={filters}
         />

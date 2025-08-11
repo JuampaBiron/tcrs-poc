@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo } from "react"
 import { Eye, CheckCircle, XCircle, Clock, User, Calendar, DollarSign } from "lucide-react"
 
 interface Request {
@@ -8,98 +8,25 @@ interface Request {
   title: string
   status: 'pending' | 'approved' | 'rejected' | 'in-review'
   reviewer: string
+  requester?: string
   submittedOn: string
   amount?: string
-  vendor?: string
   branch: string
-  requester?: string
 }
 
 interface RequestsTableProps {
   userRole?: 'requester' | 'approver' | 'admin'
+  requests: Request[]
   searchQuery?: string
-  filters?: any
+  filters?: Record<string, string>
 }
 
 export default function RequestsTable({ 
   userRole = 'requester',
+  requests = [],
   searchQuery = "",
   filters = {}
 }: RequestsTableProps) {
-  
-  // Mock data - esto vendría de la base de datos
-  const [requests] = useState<Request[]>([
-    {
-      id: "REQ-001",
-      title: "TCRS - Branch 1 - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review",
-      reviewer: "Manager 1",
-      submittedOn: "03/10/25",
-      amount: "$2,500",
-      vendor: "Vendor A",
-      branch: "TCRS - Branch 1"
-    },
-    {
-      id: "REQ-002", 
-      title: "Sitech - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review",
-      reviewer: "Manager1, Manager 2",
-      submittedOn: "03/07/25", 
-      amount: "$1,800",
-      vendor: "Vendor B",
-      branch: "Sitech"
-    },
-    {
-      id: "REQ-003",
-      title: "TCRS - Branch 2 - Vendor # - PO # - Invoice Amount - Currency", 
-      status: "in-review",
-      reviewer: "Manager 2",
-      submittedOn: "03/06/25",
-      amount: "$4,200",
-      vendor: "Vendor C", 
-      branch: "TCRS - Branch 2"
-    },
-    {
-      id: "REQ-004",
-      title: "Fused-Canada - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review", 
-      reviewer: "Manager 3",
-      submittedOn: "03/06/25",
-      amount: "$3,100",
-      vendor: "Vendor D",
-      branch: "Fused-Canada"
-    },
-    {
-      id: "REQ-005",
-      title: "Fused-UK - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review",
-      reviewer: "Manager2, Manager 3", 
-      submittedOn: "02/28/25",
-      amount: "$5,600",
-      vendor: "Vendor E",
-      branch: "Fused-UK"
-    },
-    {
-      id: "REQ-006",
-      title: "TCRS - Branch 3 - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review",
-      reviewer: "Manager 1",
-      submittedOn: "03/02/25", 
-      amount: "$890",
-      vendor: "Vendor F",
-      branch: "TCRS - Branch 3"
-    },
-    {
-      id: "REQ-007",
-      title: "TCRS - Branch 1 - Vendor # - PO # - Invoice Amount - Currency",
-      status: "in-review",
-      reviewer: "Manager 2", 
-      submittedOn: "03/03/25",
-      amount: "$7,200",
-      vendor: "Vendor G",
-      branch: "TCRS - Branch 1"
-    }
-  ])
 
   const getStatusBadge = (status: Request['status']) => {
     const badges = {
@@ -129,7 +56,7 @@ export default function RequestsTable({
       }
     }
     
-    const badge = badges[status]
+    const badge = badges[status] || badges['pending']
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
         {badge.icon}
@@ -143,28 +70,57 @@ export default function RequestsTable({
     console.log('View request:', requestId)
   }
 
-  const handleApproveRequest = (requestId: string) => {
-    // TODO: Approve request logic
-    console.log('Approve request:', requestId) 
+  const handleApproveRequest = async (requestId: string) => {
+    try {
+      const response = await fetch('/api/requests/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId })
+      })
+      
+      if (response.ok) {
+        // Refresh the page to show updated data
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Error approving request:', error)
+    }
   }
 
-  const handleRejectRequest = (requestId: string) => {
-    // TODO: Reject request logic
-    console.log('Reject request:', requestId)
+  const handleRejectRequest = async (requestId: string) => {
+    const reason = prompt('Please provide a reason for rejection:')
+    if (!reason) return
+
+    try {
+      const response = await fetch('/api/requests/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reason })
+      })
+      
+      if (response.ok) {
+        // Refresh the page to show updated data  
+        window.location.reload()
+      }
+    } catch (error) {
+      console.error('Error rejecting request:', error)
+    }
   }
 
   // Filter requests based on search and filters
-  const filteredRequests = requests.filter(request => {
-    const matchesSearch = searchQuery === "" || 
-      request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.reviewer.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      request.branch.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    const matchesStatus = !filters.status || request.status === filters.status
-    const matchesBranch = !filters.branch || request.branch.toLowerCase().includes(filters.branch.toLowerCase())
-    
-    return matchesSearch && matchesStatus && matchesBranch
-  })
+  const filteredRequests = useMemo(() => {
+    return requests.filter(request => {
+      const matchesSearch = searchQuery === "" || 
+        request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.reviewer.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.branch.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      const matchesStatus = !filters.status || request.status === filters.status
+      const matchesBranch = !filters.branch || request.branch.toLowerCase().includes(filters.branch.toLowerCase())
+      
+      return matchesSearch && matchesStatus && matchesBranch
+    })
+  }, [requests, searchQuery, filters])
 
   return (
     <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
@@ -224,7 +180,9 @@ export default function RequestsTable({
                   {getStatusBadge(request.status)}
                 </td>
                 <td className="px-6 py-4">
-                  <div className="text-sm text-gray-900">{request.reviewer}</div>
+                  <div className="text-sm text-gray-900">
+                    {userRole === 'requester' ? request.reviewer : request.requester || request.reviewer}
+                  </div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-1 text-sm text-gray-900">
@@ -242,7 +200,7 @@ export default function RequestsTable({
                       View
                     </button>
                     
-                    {userRole === 'approver' && request.status === 'in-review' && (
+                    {userRole === 'approver' && request.status === 'pending' && (
                       <>
                         <button
                           onClick={() => handleApproveRequest(request.id)}
@@ -271,7 +229,12 @@ export default function RequestsTable({
           <div className="text-center py-12">
             <div className="text-gray-400 text-6xl mb-4">📄</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No requests found</h3>
-            <p className="text-gray-500">Try adjusting your search or filter criteria.</p>
+            <p className="text-gray-500">
+              {requests.length === 0 
+                ? "No requests available. Create your first request to get started!"
+                : "Try adjusting your search or filter criteria."
+              }
+            </p>
           </div>
         )}
       </div>

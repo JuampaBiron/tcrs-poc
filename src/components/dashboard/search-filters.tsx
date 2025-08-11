@@ -10,7 +10,7 @@ interface SearchFiltersProps {
   userRole?: 'requester' | 'approver' | 'admin'
 }
 
-interface FilterState {
+export interface FilterState {
   status: string
   dateRange: string
   amount: string

@@ -9,88 +9,94 @@ interface StatCard {
 
 interface StatsCardsProps {
   userRole?: 'requester' | 'approver' | 'admin'
+  stats: {
+    total: number
+    pending: number
+    approved: number
+    rejected: number
+  }
 }
 
-export default function StatsCards({ userRole = 'requester' }: StatsCardsProps) {
-  // Mock data - esto vendría de la base de datos
+export default function StatsCards({ userRole = 'requester', stats }: StatsCardsProps) {
+  
   const getStatsForRole = (role: string): StatCard[] => {
     switch (role) {
       case 'approver':
         return [
           {
             title: "Requests to be reviewed",
-            count: 6,
-            subtitle: "Oldest request is from 6 days ago",
+            count: stats.pending,
+            subtitle: stats.pending > 0 ? "Awaiting your approval" : "All caught up!",
             bgColor: "bg-amber-50",
             textColor: "text-amber-800",
             icon: "👀"
           },
           {
             title: "Approved Requests", 
-            count: 10,
-            subtitle: "2 rejected requests",
+            count: stats.approved,
+            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected requests` : "Great job!",
             bgColor: "bg-green-50",
             textColor: "text-green-800", 
             icon: "✅"
           },
           {
-            title: "Processing Time",
-            count: 2.3,
-            subtitle: "Average days",
+            title: "Total Handled",
+            count: stats.approved + stats.rejected,
+            subtitle: "This period",
             bgColor: "bg-blue-50",
             textColor: "text-blue-800",
-            icon: "⏱️"
+            icon: "📊"
           }
         ]
       case 'admin':
         return [
           {
             title: "Total Requests",
-            count: 45,
-            subtitle: "This month",
+            count: stats.total,
+            subtitle: "All time",
             bgColor: "bg-purple-50",
             textColor: "text-purple-800",
             icon: "📊"
           },
           {
-            title: "Active Users",
-            count: 18,
-            subtitle: "Last 7 days", 
-            bgColor: "bg-indigo-50",
-            textColor: "text-indigo-800",
-            icon: "👥"
+            title: "Pending Review",
+            count: stats.pending,
+            subtitle: "Needs attention", 
+            bgColor: "bg-orange-50",
+            textColor: "text-orange-800",
+            icon: "⏳"
           },
           {
-            title: "System Health",
-            count: 99.9,
-            subtitle: "% Uptime",
+            title: "Completion Rate",
+            count: stats.total > 0 ? Math.round(((stats.approved + stats.rejected) / stats.total) * 100) : 0,
+            subtitle: "% Processed",
             bgColor: "bg-emerald-50",
             textColor: "text-emerald-800",
-            icon: "🟢"
+            icon: "🎯"
           }
         ]
       default: // requester
         return [
           {
-            title: "Associated Request",
-            count: 16,
-            subtitle: "12 completed requests",
+            title: "Your Requests",
+            count: stats.total,
+            subtitle: `${stats.approved + stats.rejected} completed`,
             bgColor: "bg-yellow-50",
             textColor: "text-yellow-800", 
             icon: "📄"
           },
           {
             title: "Pending Approval",
-            count: 4,
+            count: stats.pending,
             subtitle: "Awaiting review",
             bgColor: "bg-orange-50", 
             textColor: "text-orange-800",
             icon: "⏳"
           },
           {
-            title: "Approved Requests",
-            count: 10,
-            subtitle: "2 rejected requests", 
+            title: "Approved",
+            count: stats.approved,
+            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected` : "All approved!", 
             bgColor: "bg-green-50",
             textColor: "text-green-800",
             icon: "✅"
@@ -99,33 +105,33 @@ export default function StatsCards({ userRole = 'requester' }: StatsCardsProps) 
     }
   }
 
-  const stats = getStatsForRole(userRole)
+  const cards = getStatsForRole(userRole)
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {stats.map((stat, index) => (
+      {cards.map((card, index) => (
         <div
           key={index}
-          className={`${stat.bgColor} rounded-xl p-6 border-2 border-gray-200 hover:border-yellow-300 transition-all duration-200 hover:shadow-lg`}
+          className={`${card.bgColor} rounded-xl p-6 border-2 border-gray-200 hover:border-yellow-300 transition-all duration-200 hover:shadow-lg`}
         >
           <div className="flex items-start justify-between mb-4">
-            <div className="text-3xl">{stat.icon}</div>
+            <div className="text-3xl">{card.icon}</div>
             <div className="text-right">
-              <div className={`text-3xl font-bold ${stat.textColor}`}>
-                {typeof stat.count === 'number' && stat.count % 1 !== 0 
-                  ? stat.count.toFixed(1) 
-                  : stat.count}
+              <div className={`text-3xl font-bold ${card.textColor}`}>
+                {typeof card.count === 'number' && card.count % 1 !== 0 
+                  ? card.count.toFixed(1) 
+                  : card.count}
               </div>
             </div>
           </div>
           
           <div>
-            <h3 className={`font-semibold text-lg ${stat.textColor} mb-2`}>
-              {stat.title}
+            <h3 className={`font-semibold text-lg ${card.textColor} mb-2`}>
+              {card.title}
             </h3>
-            {stat.subtitle && (
+            {card.subtitle && (
               <p className="text-gray-600 text-sm">
-                {stat.subtitle}
+                {card.subtitle}
               </p>
             )}
           </div>
