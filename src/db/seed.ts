@@ -3,6 +3,7 @@ import { config } from 'dotenv'
 config({ path: '.env.local' })
 
 import { db, workflowSteps, approvalRequests, NewWorkflowStep, NewApprovalRequest } from "./index"
+import { REQUEST_STATUS } from "@/constants"
 
 // Datos iniciales para WorkflowSteps basados en dbdiagram.txt
 const initialWorkflowSteps: NewWorkflowStep[] = [
@@ -208,32 +209,32 @@ const sampleRequests: NewApprovalRequest[] = [
   {
     requester: "test@sisuadigital.com",
     assignedApprover: "manager1@sisuadigital.com", 
-    approverStatus: "pending",
+    approverStatus: REQUEST_STATUS.PENDING,
     comments: "TCRS - Branch 1 - Vendor A - PO-12345 - Invoice $2,500 CAD"
   },
   {
     requester: "test@sisuadigital.com",
     assignedApprover: "manager2@sisuadigital.com",
-    approverStatus: "pending", 
+    approverStatus: REQUEST_STATUS.PENDING, 
     comments: "Sitech - Vendor B - PO-67890 - Invoice $1,800 CAD"
   },
   {
     requester: "user2@sisuadigital.com",
     assignedApprover: "manager1@sisuadigital.com",
-    approverStatus: "approved",
+    approverStatus: REQUEST_STATUS.APPROVED,
     comments: "TCRS - Branch 2 - Vendor C - PO-54321 - Invoice $4,200 CAD",
     approvedDate: new Date()
   },
   {
     requester: "user3@sisuadigital.com", 
     assignedApprover: "manager3@sisuadigital.com",
-    approverStatus: "pending",
+    approverStatus: REQUEST_STATUS.PENDING,
     comments: "Fused-Canada - Vendor D - PO-98765 - Invoice $3,100 CAD"
   },
   {
     requester: "test@sisuadigital.com",
     assignedApprover: "manager2@sisuadigital.com",
-    approverStatus: "rejected",
+    approverStatus: REQUEST_STATUS.REJECTED,
     comments: "Fused-UK - Vendor E - PO-11111 - Invoice $5,600 GBP - Missing documentation"
   }
 ]

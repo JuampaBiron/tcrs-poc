@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { Eye, CheckCircle, XCircle, User, Calendar, DollarSign } from "lucide-react"
 import { Request, UserRole, FilterState } from "@/types"
 import { apiClient } from "@/lib/api-client"
+import { USER_ROLES, REQUEST_STATUS } from "@/constants"
 import StatusBadge from "../ui/status-badge"
 
 interface RequestsTableProps {
@@ -15,7 +16,7 @@ interface RequestsTableProps {
 }
 
 export default function RequestsTable({ 
-  userRole = 'requester',
+  userRole = USER_ROLES.REQUESTER,
   requests = [],
   searchQuery = "",
   filters = { status: "", dateRange: "", amount: "", branch: "" },
@@ -91,7 +92,7 @@ export default function RequestsTable({
     <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
       <div className="px-6 py-4 bg-gray-50 border-b-2 border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">
-          {userRole === 'approver' ? 'Pending Requests' : userRole === 'admin' ? 'All Requests' : 'My Requests'}
+          {userRole === USER_ROLES.APPROVER ? 'Pending Requests' : userRole === USER_ROLES.ADMIN ? 'All Requests' : 'My Requests'}
         </h2>
         <p className="text-gray-600 text-sm mt-1">
           {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} found
@@ -109,7 +110,7 @@ export default function RequestsTable({
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {userRole === 'requester' ? 'Reviewer' : 'Requester'}
+                {userRole === USER_ROLES.REQUESTER ? 'Reviewer' : 'Requester'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Submitted On
@@ -146,7 +147,7 @@ export default function RequestsTable({
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-gray-900">
-                    {userRole === 'requester' ? request.reviewer : request.requester || request.reviewer}
+                    {userRole === USER_ROLES.REQUESTER ? request.reviewer : request.requester || request.reviewer}
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -165,7 +166,7 @@ export default function RequestsTable({
                       View
                     </button>
                     
-                    {userRole === 'approver' && request.status === 'pending' && (
+                    {userRole === USER_ROLES.APPROVER && request.status === REQUEST_STATUS.PENDING && (
                       <>
                         <button
                           onClick={() => handleApproveRequest(request.id)}

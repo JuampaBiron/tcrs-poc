@@ -1,5 +1,7 @@
 import { eq, desc, and, count, sql } from "drizzle-orm"
 import { db, approvalRequests, workflowHistory, workflowSteps } from "./index"
+import { USER_ROLES, REQUEST_STATUS } from "@/constants"
+import { UserRole } from "@/types"
 
 // ===== DASHBOARD QUERIES =====
 
@@ -39,9 +41,9 @@ export async function getRequestStats() {
 
   return {
     total: stats.reduce((sum, stat) => sum + stat.count, 0),
-    pending: stats.find(s => s.status === 'pending')?.count || 0,
-    approved: stats.find(s => s.status === 'approved')?.count || 0,
-    rejected: stats.find(s => s.status === 'rejected')?.count || 0
+    pending: stats.find(s => s.status === REQUEST_STATUS.PENDING)?.count || 0,
+    approved: stats.find(s => s.status === REQUEST_STATUS.APPROVED)?.count || 0,
+    rejected: stats.find(s => s.status === REQUEST_STATUS.REJECTED)?.count || 0
   }
 }
 
@@ -57,9 +59,9 @@ export async function getRequestStatsByUser(userEmail: string) {
 
   return {
     total: stats.reduce((sum, stat) => sum + stat.count, 0),
-    pending: stats.find(s => s.status === 'pending')?.count || 0,
-    approved: stats.find(s => s.status === 'approved')?.count || 0,
-    rejected: stats.find(s => s.status === 'rejected')?.count || 0
+    pending: stats.find(s => s.status === REQUEST_STATUS.PENDING)?.count || 0,
+    approved: stats.find(s => s.status === REQUEST_STATUS.APPROVED)?.count || 0,
+    rejected: stats.find(s => s.status === REQUEST_STATUS.REJECTED)?.count || 0
   }
 }
 
@@ -73,9 +75,9 @@ export async function getRequestStatsByApprover(approverEmail: string) {
     .where(eq(approvalRequests.assignedApprover, approverEmail))
     .groupBy(approvalRequests.approverStatus)
 
-  const pendingCount = stats.find(s => s.status === 'pending')?.count || 0
-  const approvedCount = stats.find(s => s.status === 'approved')?.count || 0
-  const rejectedCount = stats.find(s => s.status === 'rejected')?.count || 0
+  const pendingCount = stats.find(s => s.status === REQUEST_STATUS.PENDING)?.count || 0
+  const approvedCount = stats.find(s => s.status === REQUEST_STATUS.APPROVED)?.count || 0
+  const rejectedCount = stats.find(s => s.status === REQUEST_STATUS.REJECTED)?.count || 0
 
   return {
     total: pendingCount + approvedCount + rejectedCount,
@@ -126,7 +128,7 @@ export async function createApprovalRequest(data: {
     .insert(approvalRequests)
     .values({
       ...data,
-      approverStatus: 'pending'
+      approverStatus: REQUEST_STATUS.PENDING
     })
     .returning()
 
@@ -135,14 +137,14 @@ export async function createApprovalRequest(data: {
 
 export async function updateRequestStatus(
   requestId: string, 
-  status: 'approved' | 'rejected',
+  status: typeof REQUEST_STATUS.APPROVED | typeof REQUEST_STATUS.REJECTED,
   comments?: string
 ) {
   const [request] = await db
     .update(approvalRequests)
     .set({
       approverStatus: status,
-      approvedDate: status === 'approved' ? new Date() : null,
+      approvedDate: status === REQUEST_STATUS.APPROVED ? new Date() : null,
       comments,
       modifiedDate: new Date()
     })
@@ -196,15 +198,15 @@ export async function searchRequests(params: {
   query?: string
   status?: string
   userEmail?: string
-  userRole?: 'requester' | 'approver' | 'admin'
+  userRole?: UserRole
 }) {
   const conditions = []
 
   // Filter by user role
   if (params.userEmail && params.userRole) {
-    if (params.userRole === 'requester') {
+    if (params.userRole === USER_ROLES.REQUESTER) {
       conditions.push(eq(approvalRequests.requester, params.userEmail))
-    } else if (params.userRole === 'approver') {
+    } else if (params.userRole === USER_ROLES.APPROVER) {
       conditions.push(eq(approvalRequests.assignedApprover, params.userEmail))
     }
     // Admin sees all requests (no filter)
@@ -212,7 +214,7 @@ export async function searchRequests(params: {
 
   // Filter by status
   if (params.status) {
-    conditions.push(eq(approvalRequests.approverStatus, params.status as 'pending' | 'approved' | 'rejected'))
+    conditions.push(eq(approvalRequests.approverStatus, params.status as typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]))
   }
 
   // Text search (basic implementation)

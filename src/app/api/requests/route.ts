@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
-import { USER_ROLES, isValidUserRole } from '@/constants'
+import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
 
 export async function GET(request: NextRequest) {
   try {
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const transformedRequests = requests.map(req => ({
       id: req.requestId,
       title: req.comments || 'No description',
-      status: req.approverStatus || 'pending',
+      status: req.approverStatus || REQUEST_STATUS.PENDING,
       reviewer: req.assignedApprover || 'Unassigned',
       requester: req.requester || 'Unknown',
       submittedOn: req.createdDate ? new Date(req.createdDate).toLocaleDateString('en-US', {

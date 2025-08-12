@@ -4,7 +4,7 @@ import { useState } from "react"
 import { Search, Filter, Download, X } from "lucide-react"
 
 import { UserRole, FilterState } from "@/types"
-import { FILTER_OPTIONS } from "@/constants"
+import { FILTER_OPTIONS, USER_ROLES } from "@/constants"
 
 interface SearchFiltersProps {
   onSearch: (query: string) => void
@@ -18,7 +18,7 @@ export default function SearchFilters({
   onSearch, 
   onFilterChange, 
   onExport,
-  userRole = 'requester',
+  userRole = USER_ROLES.REQUESTER,
   exportLoading = false
 }: SearchFiltersProps) {
   const [searchQuery, setSearchQuery] = useState("")

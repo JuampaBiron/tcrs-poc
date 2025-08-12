@@ -2,14 +2,16 @@
 
 import { useState } from "react"
 import { Plus, FileText, Upload, Send } from "lucide-react"
+import { UserRole } from "@/types"
+import { USER_ROLES } from "@/constants"
 
 interface CreateRequestButtonProps {
-  userRole?: 'requester' | 'approver' | 'admin'
+  userRole?: UserRole
   onCreateRequest?: () => void
 }
 
 export default function CreateRequestButton({ 
-  userRole = 'requester',
+  userRole = USER_ROLES.REQUESTER,
   onCreateRequest 
 }: CreateRequestButtonProps) {
   const [showQuickActions, setShowQuickActions] = useState(false)
@@ -34,7 +36,7 @@ export default function CreateRequestButton({
   }
 
   // Only show create button for requesters and admins
-  if (userRole === 'approver') {
+  if (userRole === USER_ROLES.APPROVER) {
     return null
   }
 
