@@ -1,8 +1,8 @@
 // Shared types for the TCRS application
+import { USER_ROLES, REQUEST_STATUS } from '@/constants'
 
-export type UserRole = 'requester' | 'approver' | 'admin'
-
-export type RequestStatus = 'pending' | 'approved' | 'rejected' | 'in-review'
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
+export type RequestStatus = typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]
 
 export interface Request {
   id: string
@@ -77,7 +77,7 @@ export interface DbApprovalRequest {
   requestId: string
   requester: string | null
   assignedApprover: string | null
-  approverStatus: 'pending' | 'approved' | 'rejected' | null
+  approverStatus: RequestStatus | null
   approvedDate: Date | null
   comments: string | null
   createdDate: Date | null
