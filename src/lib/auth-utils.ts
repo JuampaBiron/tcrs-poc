@@ -1,15 +1,27 @@
 import { User } from "next-auth"
+import { UserRole } from "@/types"
+import { ROLE_DISPLAY_NAMES, USER_ROLES } from "@/constants"
 
-export type UserRole = 'requester' | 'approver' | 'admin'
-
-// Mock function to determine user role based on email
-// In production, this would come from database or external system
+// WARNING: This is a temporary implementation for POC
+// In production, user roles should be fetched from database
 export function getUserRole(user: User): UserRole {
   const email = user.email?.toLowerCase()
   
   if (!email) return 'requester'
   
-  // Define role mapping based on email patterns
+  // Environment-based role mapping for specific emails
+  const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  const approverEmails = process.env.APPROVER_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+  
+  if (adminEmails.includes(email)) {
+    return 'admin'
+  }
+  
+  if (approverEmails.includes(email)) {
+    return 'approver'
+  }
+  
+  // Fallback to pattern-based detection (less secure)
   if (email.includes('admin') || email.includes('administrator')) {
     return 'admin'
   }
@@ -23,22 +35,17 @@ export function getUserRole(user: User): UserRole {
 }
 
 export function getRoleDisplayName(role: UserRole): string {
-  const roleNames: Record<UserRole, string> = {
-    'requester': 'Requester',
-    'approver': 'Approver', 
-    'admin': 'Administrator'
-  }
-  return roleNames[role] || 'User'
+  return ROLE_DISPLAY_NAMES[role] || 'User'
 }
 
 export function getRolePermissions(role: UserRole) {
   const permissions = {
-    canCreateRequests: ['requester', 'admin'].includes(role),
-    canApproveRequests: ['approver', 'admin'].includes(role),
-    canViewAllRequests: ['admin'].includes(role),
-    canManageUsers: ['admin'].includes(role),
-    canExportData: ['approver', 'admin'].includes(role),
-    canAccessReports: ['approver', 'admin'].includes(role)
+    canCreateRequests: ([USER_ROLES.REQUESTER, USER_ROLES.ADMIN] as string[]).includes(role),
+    canApproveRequests: ([USER_ROLES.APPROVER, USER_ROLES.ADMIN] as string[]).includes(role),
+    canViewAllRequests: ([USER_ROLES.ADMIN] as string[]).includes(role),
+    canManageUsers: ([USER_ROLES.ADMIN] as string[]).includes(role),
+    canExportData: ([USER_ROLES.APPROVER, USER_ROLES.ADMIN] as string[]).includes(role),
+    canAccessReports: ([USER_ROLES.APPROVER, USER_ROLES.ADMIN] as string[]).includes(role)
   }
   
   return permissions

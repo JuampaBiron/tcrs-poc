@@ -1,30 +1,36 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
+import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
+import { USER_ROLES, isValidUserRole } from '@/constants'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const role = searchParams.get('role') as 'requester' | 'approver' | 'admin'
+    const role = searchParams.get('role')
     const email = searchParams.get('email')
 
     if (!role || !email) {
-      return NextResponse.json({ error: 'Missing role or email' }, { status: 400 })
+      throw new ValidationError('Missing required parameters: role and email')
+    }
+
+    if (!isValidUserRole(role)) {
+      throw new ValidationError('Invalid role. Must be requester, approver, or admin')
     }
 
     let requests
     
     switch (role) {
-      case 'requester':
+      case USER_ROLES.REQUESTER:
         requests = await getRequestsByUser(email)
         break
-      case 'approver':
+      case USER_ROLES.APPROVER:
         requests = await getRequestsByApprover(email)
         break
-      case 'admin':
+      case USER_ROLES.ADMIN:
         requests = await getAllRequests()
         break
       default:
-        return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+        throw new ValidationError('Invalid role')
     }
 
     // Transform data for frontend
@@ -43,11 +49,10 @@ export async function GET(request: NextRequest) {
       amount: extractAmount(req.comments || '')
     }))
 
-    return NextResponse.json({ requests: transformedRequests })
+    return createSuccessResponse({ requests: transformedRequests })
 
   } catch (error) {
-    console.error('Error fetching requests:', error)
-    return NextResponse.json({ error: 'Failed to fetch requests' }, { status: 500 })
+    return createErrorResponse(error as Error)
   }
 }
 

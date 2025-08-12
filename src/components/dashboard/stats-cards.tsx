@@ -1,3 +1,5 @@
+import { USER_ROLES } from "@/constants"
+
 interface StatCard {
   title: string
   count: number
@@ -21,7 +23,7 @@ export default function StatsCards({ userRole = 'requester', stats }: StatsCards
   
   const getStatsForRole = (role: string): StatCard[] => {
     switch (role) {
-      case 'approver':
+      case USER_ROLES.APPROVER:
         return [
           {
             title: "Requests to be reviewed",
@@ -48,7 +50,7 @@ export default function StatsCards({ userRole = 'requester', stats }: StatsCards
             icon: "📊"
           }
         ]
-      case 'admin':
+      case USER_ROLES.ADMIN:
         return [
           {
             title: "Total Requests",

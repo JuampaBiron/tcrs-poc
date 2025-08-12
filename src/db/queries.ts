@@ -212,7 +212,7 @@ export async function searchRequests(params: {
 
   // Filter by status
   if (params.status) {
-    conditions.push(eq(approvalRequests.approverStatus, params.status as any))
+    conditions.push(eq(approvalRequests.approverStatus, params.status as 'pending' | 'approved' | 'rejected'))
   }
 
   // Text search (basic implementation)
