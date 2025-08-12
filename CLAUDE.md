@@ -4,19 +4,43 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 🚨 CRITICAL CODING RULES (MUST FOLLOW)
 
-### 1. NEVER Use Hardcoded Values
+### 1. NEVER Use Hardcoded Values - CONSTANTS ARE SOURCE OF TRUTH
 - **FORBIDDEN**: Direct role strings like `'admin'`, `'pending'`, etc.
 - **REQUIRED**: Always use constants from `/src/constants`
+- **CRITICAL**: `src/constants/index.ts` is the SINGLE SOURCE OF TRUTH for all application constants
+- **RULE**: Types MUST derive from constants, not the other way around
+
 ```typescript
-// ✅ CORRECT
+// ✅ CORRECT - Constants define types
+// In src/constants/index.ts
+export const USER_ROLES = {
+  REQUESTER: 'requester',
+  APPROVER: 'approver', 
+  ADMIN: 'admin'
+} as const
+
+// In src/types/index.ts  
+import { USER_ROLES } from '@/constants'
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
+
+// In components/API routes
 import { USER_ROLES, REQUEST_STATUS } from '@/constants'
 case USER_ROLES.ADMIN:
 if (status === REQUEST_STATUS.PENDING)
+if (userRole === USER_ROLES.APPROVER)
 
 // ❌ WRONG - NEVER DO THIS
 case 'admin':
 if (status === 'pending')
+userRole?: 'requester' | 'approver' | 'admin'  // ❌ Don't define types inline
 ```
+
+**MANDATORY CONSTANTS USAGE:**
+- ALL user roles: Use `USER_ROLES.REQUESTER`, `USER_ROLES.APPROVER`, `USER_ROLES.ADMIN`
+- ALL request statuses: Use `REQUEST_STATUS.PENDING`, `REQUEST_STATUS.APPROVED`, etc.
+- ALL comparisons: `userRole === USER_ROLES.ADMIN` not `userRole === 'admin'`
+- ALL default values: `userRole = USER_ROLES.REQUESTER` not `userRole = 'requester'`
+- ALL TypeScript types: Derive from constants using `typeof USER_ROLES[keyof typeof USER_ROLES]`
 
 ### 2. Component Size Limits
 - **Maximum 200 - 250 lines per component**
@@ -98,6 +122,13 @@ src/
   - `/api/requests` - Request management (with role validation)
   - `/api/stats` - Dashboard statistics (with role validation)
   - `/api/export` - Data export functionality
+
+### Constants Architecture (CRITICAL)
+- **Single Source of Truth**: `src/constants/index.ts` defines ALL application constants
+- **Type Derivation**: Types in `src/types/index.ts` MUST derive from constants
+- **Validation Functions**: `isValidUserRole()`, `isValidRequestStatus()` enforce type safety
+- **Import Pattern**: Always import constants, never hardcode values
+- **Automatic Sync**: Types automatically stay in sync with constant changes
 
 ### Database Queries
 - Centralized in `src/db/queries.ts`
@@ -275,25 +306,44 @@ if (error) return <ErrorMessage message={error} onRetry={refetch} />
 
 ## 🚫 FORBIDDEN Practices
 
-- ❌ Hardcoded roles: `'admin'`, `'pending'`, etc.
+### Constants & Types
+- ❌ Hardcoded roles: `'admin'`, `'pending'`, `'requester'`, `'approver'`, etc.
+- ❌ Hardcoded status: `'approved'`, `'rejected'`, `'in-review'`, etc.  
+- ❌ Inline type definitions: `userRole?: 'requester' | 'approver'`
+- ❌ Types defining constants instead of constants defining types
+- ❌ Comparing with strings: `userRole === 'admin'`
+- ❌ Default string values: `userRole = 'requester'`
+
+### Code Structure
 - ❌ Components over 100 lines
 - ❌ Direct API calls in components
 - ❌ `window.location.reload()` for updates
 - ❌ Unhandled errors or silent failures
 - ❌ Mixed folder organization
 - ❌ Deep relative imports (`../../../`)
+
+### Security  
 - ❌ Hardcoded security values
 - ❌ Client-side role authorization
+- ❌ Hardcoded domains or emails
 
 ## 💡 Quick Reference
 
 ### When Adding New Features
-1. Check if constants need updates (`/src/constants`)
-2. Add TypeScript types (`/src/types`)
-3. Create reusable components in correct folder
+1. **FIRST**: Update constants in `/src/constants` (if needed)
+2. **SECOND**: Types in `/src/types` will auto-derive from constants
+3. Create reusable components in correct folder using constants
 4. Use custom hooks for data fetching
 5. Implement proper error handling
-6. Test with `npm run build`
+6. **VERIFY**: No hardcoded values anywhere
+7. Test with `npm run build`
+
+### When Adding New Constants  
+1. Add to appropriate section in `/src/constants/index.ts`
+2. Export validation functions if needed
+3. **NEVER** define types separately - let them derive from constants
+4. Update filter options or display mappings as needed
+5. Verify all usage points import the constant
 
 ### When Fixing Issues
 1. Check CODE_REVIEW.md for known patterns
