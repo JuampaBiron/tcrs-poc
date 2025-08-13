@@ -1,70 +1,27 @@
 "use client"
 
 import { useMemo } from "react"
-import { Eye, CheckCircle, XCircle, Clock, User, Calendar, DollarSign } from "lucide-react"
-import { FilterState } from "./search-filters"
-
-interface Request {
-  id: string
-  title: string
-  status: 'pending' | 'approved' | 'rejected' | 'in-review'
-  reviewer: string
-  requester?: string
-  submittedOn: string
-  amount?: string
-  branch: string
-}
+import { Eye, CheckCircle, XCircle, User, Calendar, DollarSign } from "lucide-react"
+import { Request, UserRole, FilterState } from "@/types"
+import { apiClient } from "@/lib/api-client"
+import { USER_ROLES, REQUEST_STATUS } from "@/constants"
+import StatusBadge from "../ui/status-badge"
 
 interface RequestsTableProps {
-  userRole?: 'requester' | 'approver' | 'admin'
+  userRole?: UserRole
   requests: Request[]
   searchQuery?: string
-  filters?: FilterState  
+  filters?: FilterState
+  onRefresh?: () => void
 }
 
 export default function RequestsTable({ 
-  userRole = 'requester',
+  userRole = USER_ROLES.REQUESTER,
   requests = [],
   searchQuery = "",
-  filters = { status: "", dateRange: "", amount: "", branch: "" }
+  filters = { status: "", dateRange: "", amount: "", branch: "" },
+  onRefresh
 }: RequestsTableProps) {
-
-  const getStatusBadge = (status: Request['status']) => {
-    const badges = {
-      'pending': { 
-        bg: 'bg-yellow-100', 
-        text: 'text-yellow-800', 
-        icon: <Clock className="w-4 h-4" />,
-        label: 'Pending'
-      },
-      'in-review': { 
-        bg: 'bg-blue-100', 
-        text: 'text-blue-800', 
-        icon: <Eye className="w-4 h-4" />,
-        label: 'In Review'
-      },
-      'approved': { 
-        bg: 'bg-green-100', 
-        text: 'text-green-800', 
-        icon: <CheckCircle className="w-4 h-4" />,
-        label: 'Approved'
-      },
-      'rejected': { 
-        bg: 'bg-red-100', 
-        text: 'text-red-800', 
-        icon: <XCircle className="w-4 h-4" />,
-        label: 'Rejected'
-      }
-    }
-    
-    const badge = badges[status] || badges['pending']
-    return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
-        {badge.icon}
-        {badge.label}
-      </span>
-    )
-  }
 
   const handleViewRequest = (requestId: string) => {
     // TODO: Navigate to request detail view
@@ -73,18 +30,22 @@ export default function RequestsTable({
 
   const handleApproveRequest = async (requestId: string) => {
     try {
-      const response = await fetch('/api/requests/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId })
-      })
+      const result = await apiClient.approveRequest(requestId)
       
-      if (response.ok) {
-        // Refresh the page to show updated data
-        window.location.reload()
+      if (result.error) {
+        console.error('Error approving request:', result.error)
+        // TODO: Show error toast
+        return
       }
+
+      // Refresh data instead of page reload
+      if (onRefresh) {
+        onRefresh()
+      }
+      // TODO: Show success toast
     } catch (error) {
       console.error('Error approving request:', error)
+      // TODO: Show error toast
     }
   }
 
@@ -93,18 +54,22 @@ export default function RequestsTable({
     if (!reason) return
 
     try {
-      const response = await fetch('/api/requests/reject', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, reason })
-      })
+      const result = await apiClient.rejectRequest(requestId, reason)
       
-      if (response.ok) {
-        // Refresh the page to show updated data
-        window.location.reload()
+      if (result.error) {
+        console.error('Error rejecting request:', result.error)
+        // TODO: Show error toast
+        return
       }
+
+      // Refresh data instead of page reload  
+      if (onRefresh) {
+        onRefresh()
+      }
+      // TODO: Show success toast
     } catch (error) {
       console.error('Error rejecting request:', error)
+      // TODO: Show error toast
     }
   }
 
@@ -127,7 +92,7 @@ export default function RequestsTable({
     <div className="bg-white rounded-xl border-2 border-gray-200 overflow-hidden">
       <div className="px-6 py-4 bg-gray-50 border-b-2 border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">
-          {userRole === 'approver' ? 'Pending Requests' : userRole === 'admin' ? 'All Requests' : 'My Requests'}
+          {userRole === USER_ROLES.APPROVER ? 'Pending Requests' : userRole === USER_ROLES.ADMIN ? 'All Requests' : 'My Requests'}
         </h2>
         <p className="text-gray-600 text-sm mt-1">
           {filteredRequests.length} request{filteredRequests.length !== 1 ? 's' : ''} found
@@ -145,7 +110,7 @@ export default function RequestsTable({
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {userRole === 'requester' ? 'Reviewer' : 'Requester'}
+                {userRole === USER_ROLES.REQUESTER ? 'Reviewer' : 'Requester'}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Submitted On
@@ -178,11 +143,11 @@ export default function RequestsTable({
                   </div>
                 </td>
                 <td className="px-6 py-4">
-                  {getStatusBadge(request.status)}
+                  <StatusBadge status={request.status} />
                 </td>
                 <td className="px-6 py-4">
                   <div className="text-sm text-gray-900">
-                    {userRole === 'requester' ? request.reviewer : request.requester || request.reviewer}
+                    {userRole === USER_ROLES.REQUESTER ? request.reviewer : request.requester || request.reviewer}
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -201,7 +166,7 @@ export default function RequestsTable({
                       View
                     </button>
                     
-                    {userRole === 'approver' && request.status === 'pending' && (
+                    {userRole === USER_ROLES.APPROVER && request.status === REQUEST_STATUS.PENDING && (
                       <>
                         <button
                           onClick={() => handleApproveRequest(request.id)}

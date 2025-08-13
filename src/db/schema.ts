@@ -12,6 +12,7 @@ import {
 } from "drizzle-orm/pg-core"
 import type { AdapterAccountType } from "next-auth/adapters"
 import { createId } from "@paralleldrive/cuid2"
+import { REQUEST_STATUS } from "@/constants"
 
 // ===== NEXTAUTH TABLES (EXISTING) =====
 
@@ -92,7 +93,7 @@ export const approvalRequests = pgTable("approval_requests", {
   requestId: varchar("request_id", { length: 255 }).primaryKey().$defaultFn(() => createId()),
   requester: varchar("requester", { length: 255 }),
   assignedApprover: varchar("assigned_approver", { length: 255 }),
-  approverStatus: varchar("approver_status", { length: 50 }).$type<'pending' | 'approved' | 'rejected'>(),
+  approverStatus: varchar("approver_status", { length: 50 }).$type<typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]>(),
   approvedDate: timestamp("approved_date"),
   comments: varchar("comments", { length: 1000 }),
   createdDate: timestamp("created_date").defaultNow(),

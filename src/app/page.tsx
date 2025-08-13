@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
-import SignInButton from "@/components/login-page/sign-in-button"
-import FinningLogo from "@/components/login-page/finning-logo"
+import SignInButton from "@/components/auth/sign-in-button"
+import FinningLogo from "@/components/common/finning-logo"
 
 export default async function LoginPage() {
   const session = await auth()
@@ -98,7 +98,7 @@ export default async function LoginPage() {
                 <div>
                   <p className="text-yellow-800 font-medium mb-1">Secure Authentication</p>
                   <p className="text-yellow-700 text-sm">
-                    Your credentials are protected by Microsoft's enterprise-grade security. 
+                    Your credentials are protected by Microsoft&apos;s enterprise-grade security. 
                   </p>
                 </div>
               </div>

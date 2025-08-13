@@ -1,3 +1,6 @@
+import { USER_ROLES } from "@/constants"
+import { UserRole } from "@/types"
+
 interface StatCard {
   title: string
   count: number
@@ -8,7 +11,7 @@ interface StatCard {
 }
 
 interface StatsCardsProps {
-  userRole?: 'requester' | 'approver' | 'admin'
+  userRole?: UserRole
   stats: {
     total: number
     pending: number
@@ -17,11 +20,11 @@ interface StatsCardsProps {
   }
 }
 
-export default function StatsCards({ userRole = 'requester', stats }: StatsCardsProps) {
+export default function StatsCards({ userRole = USER_ROLES.REQUESTER, stats }: StatsCardsProps) {
   
   const getStatsForRole = (role: string): StatCard[] => {
     switch (role) {
-      case 'approver':
+      case USER_ROLES.APPROVER:
         return [
           {
             title: "Requests to be reviewed",
@@ -48,7 +51,7 @@ export default function StatsCards({ userRole = 'requester', stats }: StatsCards
             icon: "📊"
           }
         ]
-      case 'admin':
+      case USER_ROLES.ADMIN:
         return [
           {
             title: "Total Requests",

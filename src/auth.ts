@@ -14,14 +14,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   callbacks: {
     signIn: async ({ user, account, profile }) => {
-      // Validación extra: solo permitir emails de tu dominio
-      const allowedDomains = ['@sisuadigital.com'] // Cambia por tu dominio
+      // Domain validation from environment variables
+      const allowedDomainsEnv = process.env.ALLOWED_EMAIL_DOMAINS
+      if (!allowedDomainsEnv) {
+        console.error('ALLOWED_EMAIL_DOMAINS environment variable not configured')
+        return false
+      }
+      
+      const allowedDomains = allowedDomainsEnv.split(',').map(domain => domain.trim())
       const isAllowedDomain = allowedDomains.some(domain => 
         user.email?.toLowerCase().endsWith(domain.toLowerCase())
       )
       
-      // También verificar que viene del tenant correcto
+      // Verify correct provider
       const isCorrectTenant = account?.provider === 'microsoft-entra-id'
+      
+      if (!isAllowedDomain) {
+        console.warn(`Sign-in rejected for domain: ${user.email}`)
+      }
       
       return isAllowedDomain && isCorrectTenant
     },

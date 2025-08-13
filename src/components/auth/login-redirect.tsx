@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface LoginRedirectProps {
-  session: any; // Tu tipo de session
+  session: { user?: { id?: string; email?: string; name?: string } } | null
 }
 
 export default function LoginRedirect({ session }: LoginRedirectProps) {

@@ -3,25 +3,23 @@
 import { useState } from "react"
 import { Search, Filter, Download, X } from "lucide-react"
 
+import { UserRole, FilterState } from "@/types"
+import { FILTER_OPTIONS, USER_ROLES } from "@/constants"
+
 interface SearchFiltersProps {
   onSearch: (query: string) => void
   onFilterChange: (filters: FilterState) => void
   onExport: () => void
-  userRole?: 'requester' | 'approver' | 'admin'
-}
-
-export interface FilterState {
-  status: string
-  dateRange: string
-  amount: string
-  branch: string
+  userRole?: UserRole
+  exportLoading?: boolean
 }
 
 export default function SearchFilters({ 
   onSearch, 
   onFilterChange, 
   onExport,
-  userRole = 'requester' 
+  userRole = USER_ROLES.REQUESTER,
+  exportLoading = false
 }: SearchFiltersProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [showFilters, setShowFilters] = useState(false)
@@ -87,10 +85,11 @@ export default function SearchFilters({
           
           <button
             onClick={onExport}
-            className="flex items-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+            disabled={exportLoading}
+            className="flex items-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
           >
-            <Download className="w-5 h-5" />
-            Export
+            <Download className={`w-5 h-5 ${exportLoading ? 'animate-spin' : ''}`} />
+            {exportLoading ? 'Exporting...' : 'Export'}
           </button>
         </div>
       </div>
@@ -123,10 +122,11 @@ export default function SearchFilters({
                 className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
               >
                 <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="in-review">In Review</option>
+                {FILTER_OPTIONS.STATUSES.map((status) => (
+                  <option key={status.value} value={status.value}>
+                    {status.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -141,10 +141,11 @@ export default function SearchFilters({
                 className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
               >
                 <option value="">All Dates</option>
-                <option value="today">Today</option>
-                <option value="week">This Week</option>
-                <option value="month">This Month</option>
-                <option value="quarter">This Quarter</option>
+                {FILTER_OPTIONS.DATE_RANGES.map((range) => (
+                  <option key={range.value} value={range.value}>
+                    {range.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -159,10 +160,11 @@ export default function SearchFilters({
                 className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
               >
                 <option value="">All Amounts</option>
-                <option value="0-1000">$0 - $1,000</option>
-                <option value="1000-5000">$1,000 - $5,000</option>
-                <option value="5000-10000">$5,000 - $10,000</option>
-                <option value="10000+">$10,000+</option>
+                {FILTER_OPTIONS.AMOUNTS.map((amount) => (
+                  <option key={amount.value} value={amount.value}>
+                    {amount.label}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -177,12 +179,11 @@ export default function SearchFilters({
                 className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
               >
                 <option value="">All Branches</option>
-                <option value="branch1">TCRS - Branch 1</option>
-                <option value="branch2">TCRS - Branch 2</option>
-                <option value="branch3">TCRS - Branch 3</option>
-                <option value="sitech">Sitech</option>
-                <option value="fused-canada">Fused-Canada</option>
-                <option value="fused-uk">Fused-UK</option>
+                {FILTER_OPTIONS.BRANCHES.map((branch) => (
+                  <option key={branch.value} value={branch.value}>
+                    {branch.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

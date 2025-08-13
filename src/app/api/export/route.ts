@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
+import { USER_ROLES, REQUEST_STATUS } from '@/constants'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,13 +16,13 @@ export async function POST(request: NextRequest) {
     let requests
     
     switch (role) {
-      case 'requester':
+      case USER_ROLES.REQUESTER:
         requests = await getRequestsByUser(email)
         break
-      case 'approver':
+      case USER_ROLES.APPROVER:
         requests = await getRequestsByApprover(email)
         break
-      case 'admin':
+      case USER_ROLES.ADMIN:
         requests = await getAllRequests()
         break
       default:
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
     const exportData = requests.map(req => ({
       'Request ID': req.requestId,
       'Description': req.comments || 'No description', 
-      'Status': req.approverStatus || 'pending',
+      'Status': req.approverStatus || REQUEST_STATUS.PENDING,
       'Requester': req.requester || 'Unknown',
       'Assigned Approver': req.assignedApprover || 'Unassigned',
       'Created Date': req.createdDate ? new Date(req.createdDate).toLocaleDateString() : 'Unknown',

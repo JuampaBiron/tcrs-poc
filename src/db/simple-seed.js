@@ -1,4 +1,6 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { Pool } = require('@neondatabase/serverless');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const dotenv = require('dotenv');
 
 // Load environment variables
