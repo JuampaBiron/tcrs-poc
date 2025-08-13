@@ -24,7 +24,7 @@ export default function WelcomeSection({ user, userRole, stats }: WelcomeSection
     <div className="mb-8">
       <div className="bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl p-6 text-black">
         <h2 className="text-2xl font-bold mb-2">
-          Welcome back, {user.name?.split(' ')[0] || 'User'}! 👋
+          Welcome back, {user.name?.split(' ')[0] || 'User'}! {userRole}
         </h2>
         <p className="text-black/80">
           {getWelcomeMessage()}

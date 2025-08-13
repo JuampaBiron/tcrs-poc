@@ -1,7 +1,8 @@
 import { auth } from "@/auth"
 import { redirect } from "next/navigation"
 import SignInButton from "@/components/auth/sign-in-button"
-import FinningLogo from "@/components/common/finning-logo"
+import FinningLogo from "@/components/ui/finning-logo"
+import BackgroundImage from "@/components/auth/background-image"
 
 export default async function LoginPage() {
   const session = await auth()
@@ -14,6 +15,7 @@ export default async function LoginPage() {
   // Show login page for unauthenticated users
   return (
     <div className="min-h-screen bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-500 flex items-center justify-center relative overflow-hidden">
+      <BackgroundImage />
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-20">
         <div 
@@ -38,8 +40,10 @@ export default async function LoginPage() {
       </div>
 
       {/* Main Container */}
-      <div className="flex bg-white rounded-3xl shadow-2xl backdrop-blur-md overflow-hidden max-w-7xl w-11/12 min-h-[750px] relative z-10 border-2 border-yellow-200">
-        
+      <div 
+        className="flex rounded-3xl shadow-2xl backdrop-blur-md overflow-hidden max-w-7xl w-11/12 min-h-[750px] relative z-10 border-2 border-yellow-200"
+        style={{ backgroundColor: "rgba(255,255,255,0.75)" }} // 85% opacidad
+        >
         {/* Left Panel - TCRS Branding */}
         <div className="flex-1 bg-gradient-to-br from-gray-900 via-black to-gray-800 p-20 flex flex-col justify-center text-white relative">
           <div className="mb-12">

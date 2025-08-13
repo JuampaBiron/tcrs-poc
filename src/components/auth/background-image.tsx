@@ -3,7 +3,7 @@ export default function BackgroundImage() {
     <div className="absolute inset-0">
       {/* Imagen de fondo */}
       <img 
-        src="/landscape-bg.jpg" 
+        src="/landscape.jpg" 
         alt="background"
         className="w-full h-full object-cover"
       />

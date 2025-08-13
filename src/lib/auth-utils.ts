@@ -6,35 +6,36 @@ import { ROLE_DISPLAY_NAMES, USER_ROLES } from "@/constants"
 // In production, user roles should be fetched from database
 export function getUserRole(user: User): UserRole {
   const email = user.email?.toLowerCase()
-  
+  console.log('User email:', email)
+
   if (!email) return USER_ROLES.REQUESTER
   
   // Environment-based role mapping for specific emails
   const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
   const approverEmails = process.env.APPROVER_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
-  
+  const requesterEmails = process.env.REQUESTER_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || []
+
   if (adminEmails.includes(email)) {
+    console.log('User is admin:', email)
     return USER_ROLES.ADMIN
   }
   
   if (approverEmails.includes(email)) {
+    console.log('User is approver:', email)
     return USER_ROLES.APPROVER
   }
-  
-  // Fallback to pattern-based detection (less secure)
-  if (email.includes('admin') || email.includes('administrator')) {
-    return USER_ROLES.ADMIN
+
+  if (requesterEmails.includes(email)) {
+    console.log('User is requester:', email)
+    return USER_ROLES.REQUESTER
   }
-  
-  if (email.includes('manager') || email.includes('approver')) {
-    return USER_ROLES.APPROVER
-  }
-  
+
   // Default role
   return USER_ROLES.REQUESTER
 }
 
 export function getRoleDisplayName(role: UserRole): string {
+  console.log('User role:', role)
   return ROLE_DISPLAY_NAMES[role] || 'User'
 }
 

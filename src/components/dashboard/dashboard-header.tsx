@@ -2,7 +2,7 @@
 
 import { User } from "next-auth"
 import { Bell, HelpCircle, Menu, Settings, X } from "lucide-react"
-import FinningLogo from "../common/finning-logo"
+import FinningLogo from "../ui/finning-logo"
 import { getRoleDisplayName } from "@/lib/auth-utils"
 import { UserRole } from "@/types"
 

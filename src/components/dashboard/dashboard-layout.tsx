@@ -15,8 +15,8 @@ import CreateRequestButton from "./create-request-button"
 import DashboardHeader from "./dashboard-header"
 import DashboardSidebar from "./dashboard-sidebar"
 import WelcomeSection from "./welcome-section"
-import FinningLogo from "../common/finning-logo"
-import SignOutButton from "../common/sign-out-button"
+import FinningLogo from "../ui/finning-logo"
+import SignOutButton from "../ui/sign-out-button"
 import LoadingSpinner from "../ui/loading-spinner"
 import ErrorMessage from "../ui/error-message"
 
@@ -37,6 +37,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
 
   // Get user role from email
   const userRole = getUserRole(user)
+  console.log('User in dashboard-layout role:', userRole)
 
   // Use custom hook for data fetching
   const { requests, stats, loading, error, refetch } = useDashboardData({

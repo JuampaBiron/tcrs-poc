@@ -1,6 +1,6 @@
 "use client"
 
-import SignOutButton from "../common/sign-out-button"
+import SignOutButton from "../ui/sign-out-button"
 
 interface DashboardSidebarProps {
   isOpen: boolean
