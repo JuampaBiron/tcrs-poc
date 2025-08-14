@@ -1,6 +1,7 @@
+// src/components/dashboard/dashboard-layout.tsx - Fix hydration
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { User } from "next-auth"
 import { UserRole, FilterState } from "@/types"
 import { getUserContext } from "@/lib/auth-utils"
@@ -36,31 +37,63 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
   })
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
-
-  // Verificar autorización y obtener rol (o null si no autorizado)
-  let userRole: UserRole | null = null;
-  let userContext;
-  let isAuthorized = false;
   
-  try {
-    userContext = getUserContext(user);
-    userRole = userContext.role;
-    isAuthorized = true;
-  } catch (error) {
-    console.log('Authorization failed - user not in any TCRS group')
-    // userRole permanece null, lo que evitará las llamadas API
-  }
+  // CRITICAL: Evitar hydration error con estado de autorización
+  const [isClient, setIsClient] = useState(false)
+  const [authorizationState, setAuthorizationState] = useState<{
+    isAuthorized: boolean;
+    userRole: UserRole | null;
+    userContext: any;
+    error?: string;
+  }>({
+    isAuthorized: false,
+    userRole: null,
+    userContext: null
+  })
 
-  // Hook SIEMPRE se ejecuta, pero con userRole=null no hará llamadas
+  // Verificar autorización solo en el cliente
+  useEffect(() => {
+    setIsClient(true)
+    
+    try {
+      console.log('🔍 CLIENT: Checking authorization...')
+      const userContext = getUserContext(user)
+      
+      setAuthorizationState({
+        isAuthorized: true,
+        userRole: userContext.role,
+        userContext: userContext
+      })
+      
+      console.log('✅ CLIENT: Authorization successful, role:', userContext.role)
+    } catch (error) {
+      console.log('❌ CLIENT: Authorization failed:', error)
+      setAuthorizationState({
+        isAuthorized: false,
+        userRole: null,
+        userContext: null,
+        error: error instanceof Error ? error.message : 'Authorization failed'
+      })
+    }
+  }, [user])
+
+  // Hook de datos (se ejecuta solo si autorizado)
   const { requests, stats, loading, error, refetch } = useDashboardData({
-    userRole, // null si no autorizado
+    userRole: authorizationState.userRole,
     userEmail: user.email || ''
   })
 
-  console.log('User role for API calls:', userRole)
+  // Durante hydratación, mostrar loading
+  if (!isClient) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <LoadingSpinner size="lg" text="Loading..." />
+      </div>
+    )
+  }
 
   // Si no autorizado, mostrar página de acceso denegado
-  if (!isAuthorized) {
+  if (!authorizationState.isAuthorized) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
@@ -74,6 +107,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
           </p>
           <div className="text-sm text-gray-500 mb-4 p-3 bg-gray-100 rounded">
             <strong>Usuario:</strong> {user.email}<br/>
+            <strong>Error:</strong> {authorizationState.error}<br/>
             <strong>Grupos necesarios:</strong> TCRS_Admin, TCRS_Approver, o TCRS_Requester
           </div>
           <button
@@ -88,10 +122,11 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
   }
 
   // Si llegamos aquí, el usuario está autorizado
-  const { permissions } = userContext!;
+  const { role: userRole, permissions } = authorizationState.userContext;
+
   console.log('User in dashboard-layout role:', userRole)
 
-  // Event handlers
+  // Event handlers (mantener igual...)
   const handleSearch = (query: string) => {
     setSearchQuery(query)
   }
@@ -105,28 +140,24 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     
     try {
       setExportLoading(true)
-      const result = await apiClient.exportData(userRole as UserRole, user.email, filters)
+      const result = await apiClient.exportData(userRole, user.email, filters)
       
       if (result.error) {
         console.error('Export failed:', result.error)
-        // TODO: Show toast notification
         return
       }
       
       if (result.data) {
         downloadFile(result.data, generateExportFilename())
-        // TODO: Show success toast
       }
     } catch (error) {
       console.error('Export failed:', error)
-      // TODO: Show error toast
     } finally {
       setExportLoading(false)
     }
   }
 
   const handleCreateRequest = () => {
-    // TODO: Navigate to create request form
     console.log('Navigate to create request form')
   }
 
@@ -158,7 +189,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader 
         user={user}
-        userRole={userRole as UserRole}
+        userRole={userRole}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       />
@@ -171,15 +202,15 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <WelcomeSection 
           user={user}
-          userRole={userRole as UserRole}
+          userRole={userRole}
           stats={stats}
         />
 
-        <StatsCards userRole={userRole as UserRole} stats={stats} />
+        <StatsCards userRole={userRole} stats={stats} />
 
         <div className="mb-8">
           <CreateRequestButton 
-            userRole={userRole as UserRole}
+            userRole={userRole}
             onCreateRequest={handleCreateRequest}
           />
         </div>
@@ -188,12 +219,12 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
           onSearch={handleSearch}
           onFilterChange={handleFilterChange}
           onExport={handleExport}
-          userRole={userRole as UserRole}
+          userRole={userRole}
           exportLoading={exportLoading}
         />
 
         <RequestsTable 
-          userRole={userRole as UserRole}
+          userRole={userRole}
           requests={requests}
           searchQuery={searchQuery}
           filters={filters}

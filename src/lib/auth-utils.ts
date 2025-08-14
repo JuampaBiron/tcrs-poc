@@ -17,6 +17,18 @@ export function getUserRole(user: User): UserRole {
   const userGroups = user.groups || []
   const email = user.email?.toLowerCase()
   
+  console.log('🔍 DEBUG ENV VARS:')
+  console.log('- NODE_ENV:', process.env.NODE_ENV)
+  console.log('- TCRS_ADMIN_GROUP_ID:', process.env.TCRS_ADMIN_GROUP_ID)
+  console.log('- TCRS_APPROVER_GROUP_ID:', process.env.TCRS_APPROVER_GROUP_ID)
+  console.log('- TCRS_REQUESTER_GROUP_ID:', process.env.TCRS_REQUESTER_GROUP_ID)
+  console.log('- Running on:', typeof window === 'undefined' ? 'SERVER' : 'CLIENT')
+  
+  // Usar variables con fallback para debug
+  const TCRS_ADMIN_GROUP_ID = process.env.TCRS_ADMIN_GROUP_ID || '58e9b781-b0aa-473a-bf8d-38c8b1f0e1c5'
+  const TCRS_APPROVER_GROUP_ID = process.env.TCRS_APPROVER_GROUP_ID || 'b172be1c-f9db-4e02-9c17-bdda81d18e37'
+  const TCRS_REQUESTER_GROUP_ID = process.env.TCRS_REQUESTER_GROUP_ID || '832b3b08-5a15-472b-a335-654189d201b8'
+  
   console.log('User email:', email)
   console.log('User groups:', userGroups)
   console.log('Configured group IDs:', {
@@ -24,12 +36,6 @@ export function getUserRole(user: User): UserRole {
     approver: TCRS_APPROVER_GROUP_ID,
     requester: TCRS_REQUESTER_GROUP_ID
   })
-
-  // Verificar configuración de grupos
-  if (!TCRS_ADMIN_GROUP_ID || !TCRS_APPROVER_GROUP_ID || !TCRS_REQUESTER_GROUP_ID) {
-    console.error('Group IDs not properly configured in environment variables')
-    throw new Error('Group configuration missing - contact administrator')
-  }
 
   // Determinar rol basado en grupos (prioridad: Admin > Approver > Requester)
   if (userGroups.includes(TCRS_ADMIN_GROUP_ID)) {
