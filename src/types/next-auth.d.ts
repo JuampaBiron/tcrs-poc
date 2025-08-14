@@ -8,7 +8,8 @@ declare module "next-auth" {
   interface Session {
     user: {
       id: string;
-      groups?: string[]; // Agregar groups al session
+      groups?: string[];
+      role?: string;
     } & DefaultSession["user"];
   }
  
@@ -26,5 +27,6 @@ declare module "next-auth/jwt" {
    */
   interface JWT extends DefaultJWT {
     groups?: string[]; // Agregar groups al JWT token
+    role?: string;
   }
 }
