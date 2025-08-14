@@ -1,3 +1,4 @@
+// src/auth.ts
 import NextAuth from "next-auth"
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
@@ -9,7 +10,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID!,
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET!,
-      
+      authorization: {
+        params: {
+          scope: "openid profile email User.Read"
+        }
+      }
     }),
   ],
   callbacks: {
@@ -35,10 +40,39 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       
       return isAllowedDomain && isCorrectTenant
     },
-    session: ({ session, token }) => {
+    
+    jwt: async ({ token, account, profile }) => {
+      // Include groups from ID token in JWT token
+      if (account?.id_token) {
+        try {
+          // Decode the ID token to extract groups
+          const idTokenPayload = JSON.parse(
+            Buffer.from(account.id_token.split('.')[1], 'base64').toString()
+          )
+          
+          // Add groups to our token
+          token.groups = idTokenPayload.groups || []
+          
+          console.log('User groups from Entra ID:', token.groups)
+        } catch (error) {
+          console.error('Error parsing ID token for groups:', error)
+          token.groups = []
+        }
+      }
+      
+      return token
+    },
+    
+    session: async ({ session, token }) => {
       if (token?.sub && session?.user) {
         session.user.id = token.sub
       }
+      
+      // Add groups to session for client-side access
+      if (token?.groups) {
+        session.user.groups = token.groups as string[]
+      }
+      
       return session
     },
   },

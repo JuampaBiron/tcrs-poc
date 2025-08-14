@@ -28,7 +28,11 @@ class ApiClient {
 
   // Requests API
   async getRequests(role: UserRole, email: string): Promise<{ data: { requests: Request[] } | null; error: string | null }> {
+    console.log('=== API CLIENT DEBUG ===')
+    console.log('apiClient role parameter:', role)
+    console.log('apiClient email parameter:', email)
     const params = new URLSearchParams({ role, email })
+    console.log('Final URL params:', params.toString())
     return this.makeRequest<{ requests: Request[] }>(`${API_ROUTES.REQUESTS}?${params}`)
   }
 

@@ -3,9 +3,10 @@
 import { useState } from "react"
 import { User } from "next-auth"
 import { UserRole, FilterState } from "@/types"
-import { getUserRole } from "@/lib/auth-utils"
+import { getUserContext } from "@/lib/auth-utils"
 import { useDashboardData } from "@/hooks/use-dashboard-data"
 import { downloadFile, generateExportFilename, apiClient } from "@/lib/api-client"
+import { signOut } from "next-auth/react"
 
 // Components
 import StatsCards from "./stats-cards"
@@ -25,6 +26,7 @@ interface DashboardLayoutProps {
 }
 
 export default function DashboardLayout({ user }: DashboardLayoutProps) {
+  // State management
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<FilterState>({  
     status: "",
@@ -35,16 +37,61 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
 
-  // Get user role from email
-  const userRole = getUserRole(user)
-  console.log('User in dashboard-layout role:', userRole)
+  // Verificar autorización y obtener rol (o null si no autorizado)
+  let userRole: UserRole | null = null;
+  let userContext;
+  let isAuthorized = false;
+  
+  try {
+    userContext = getUserContext(user);
+    userRole = userContext.role;
+    isAuthorized = true;
+  } catch (error) {
+    console.log('Authorization failed - user not in any TCRS group')
+    // userRole permanece null, lo que evitará las llamadas API
+  }
 
-  // Use custom hook for data fetching
+  // Hook SIEMPRE se ejecuta, pero con userRole=null no hará llamadas
   const { requests, stats, loading, error, refetch } = useDashboardData({
-    userRole,
+    userRole, // null si no autorizado
     userEmail: user.email || ''
   })
 
+  console.log('User role for API calls:', userRole)
+
+  // Si no autorizado, mostrar página de acceso denegado
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">
+          <div className="text-red-600 text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            Acceso Denegado
+          </h2>
+          <p className="text-gray-600 mb-6">
+            No tienes permisos para acceder a esta aplicación. 
+            Contacta al administrador para que te asigne a un grupo TCRS.
+          </p>
+          <div className="text-sm text-gray-500 mb-4 p-3 bg-gray-100 rounded">
+            <strong>Usuario:</strong> {user.email}<br/>
+            <strong>Grupos necesarios:</strong> TCRS_Admin, TCRS_Approver, o TCRS_Requester
+          </div>
+          <button
+            onClick={() => signOut()}
+            className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700 transition-colors"
+          >
+            Cerrar Sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Si llegamos aquí, el usuario está autorizado
+  const { permissions } = userContext!;
+  console.log('User in dashboard-layout role:', userRole)
+
+  // Event handlers
   const handleSearch = (query: string) => {
     setSearchQuery(query)
   }
@@ -58,7 +105,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     
     try {
       setExportLoading(true)
-      const result = await apiClient.exportData(userRole, user.email, filters)
+      const result = await apiClient.exportData(userRole as UserRole, user.email, filters)
       
       if (result.error) {
         console.error('Export failed:', result.error)
@@ -83,6 +130,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     console.log('Navigate to create request form')
   }
 
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -91,6 +139,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     )
   }
 
+  // Error state
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -104,11 +153,12 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     )
   }
 
+  // Main dashboard render (solo para usuarios autorizados)
   return (
     <div className="min-h-screen bg-gray-50">
       <DashboardHeader 
         user={user}
-        userRole={userRole}
+        userRole={userRole as UserRole}
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
       />
@@ -121,15 +171,15 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <WelcomeSection 
           user={user}
-          userRole={userRole}
+          userRole={userRole as UserRole}
           stats={stats}
         />
 
-        <StatsCards userRole={userRole} stats={stats} />
+        <StatsCards userRole={userRole as UserRole} stats={stats} />
 
         <div className="mb-8">
           <CreateRequestButton 
-            userRole={userRole}
+            userRole={userRole as UserRole}
             onCreateRequest={handleCreateRequest}
           />
         </div>
@@ -138,12 +188,12 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
           onSearch={handleSearch}
           onFilterChange={handleFilterChange}
           onExport={handleExport}
-          userRole={userRole}
+          userRole={userRole as UserRole}
           exportLoading={exportLoading}
         />
 
         <RequestsTable 
-          userRole={userRole}
+          userRole={userRole as UserRole}
           requests={requests}
           searchQuery={searchQuery}
           filters={filters}

@@ -1,10 +1,30 @@
-import { NextRequest } from 'next/server'
+// src/app/api/requests/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from "@/auth"
+import { getUserRole } from "@/lib/auth-utils"
 import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
 import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
 
 export async function GET(request: NextRequest) {
   try {
+    // Verificar autenticación
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // VALIDAR QUE EL USUARIO TENGA GRUPOS VÁLIDOS
+    let userRole;
+    try {
+      userRole = getUserRole(session.user);
+    } catch (error) {
+      console.log('User not authorized - no TCRS groups:', session.user.email)
+      return NextResponse.json({ 
+        error: 'User not authorized - not in any TCRS group' 
+      }, { status: 403 })
+    }
+
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role')
     const email = searchParams.get('email')
@@ -15,6 +35,20 @@ export async function GET(request: NextRequest) {
 
     if (!isValidUserRole(role)) {
       throw new ValidationError('Invalid role. Must be requester, approver, or admin')
+    }
+
+    // Verificar que el rol del parámetro coincida con el rol del usuario autenticado
+    if (role !== userRole) {
+      return NextResponse.json({ 
+        error: 'Role mismatch - not authorized for this role' 
+      }, { status: 403 })
+    }
+
+    // Verificar que el email coincida con el usuario autenticado
+    if (email !== session.user.email) {
+      return NextResponse.json({ 
+        error: 'Email mismatch - can only access own data' 
+      }, { status: 403 })
     }
 
     let requests

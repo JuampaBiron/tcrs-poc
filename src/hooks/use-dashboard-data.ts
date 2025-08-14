@@ -1,76 +1,79 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Request, Stats, UserRole } from '@/types'
+// src/hooks/use-dashboard-data.ts
+import { useState, useEffect } from 'react'
+import { UserRole, Request, Stats } from '@/types'
 import { apiClient } from '@/lib/api-client'
 
 interface UseDashboardDataProps {
-  userRole: UserRole
+  userRole: UserRole | null  // null = no autorizado
   userEmail: string
 }
 
-interface UseDashboardDataReturn {
-  requests: Request[]
-  stats: Stats
-  loading: boolean
-  error: string | null
-  refetch: () => Promise<void>
-}
-
-export function useDashboardData({ 
-  userRole, 
-  userEmail 
-}: UseDashboardDataProps): UseDashboardDataReturn {
-  const [requests, setRequests] = useState<Request[]>([])
-  const [stats, setStats] = useState<Stats>({ 
-    total: 0, 
-    pending: 0, 
-    approved: 0, 
-    rejected: 0 
-  })
-  const [loading, setLoading] = useState(true)
+export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
+  const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente
+  const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, approved: 0, rejected: 0 })
+  const [loading, setLoading] = useState(false)  // false por defecto
   const [error, setError] = useState<string | null>(null)
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
+    // SI userRole es null, NO hacer llamadas
+    if (!userRole || !userEmail) {
+      console.log('Skipping API calls - user not authorized or missing data')
+      setLoading(false)
+      return
+    }
+
     try {
       setLoading(true)
       setError(null)
 
-      // Fetch requests and stats in parallel
+      console.log(`Fetching data for role: ${userRole}, email: ${userEmail}`)
+
+      // Llamadas paralelas
       const [requestsResult, statsResult] = await Promise.all([
         apiClient.getRequests(userRole, userEmail),
         apiClient.getStats(userRole, userEmail)
       ])
 
-      // Handle requests
+      // Manejar errores de requests
       if (requestsResult.error) {
-        setError(requestsResult.error)
-      } else if (requestsResult.data) {
-        setRequests(requestsResult.data.requests || [])
+        throw new Error(`Requests error: ${requestsResult.error}`)
       }
 
-      // Handle stats
-      if (statsResult.error && !requestsResult.error) {
-        setError(statsResult.error)
-      } else if (statsResult.data) {
-        setStats(statsResult.data.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+      // Manejar errores de stats  
+      if (statsResult.error) {
+        throw new Error(`Stats error: ${statsResult.error}`)
       }
+
+      // Actualizar estado con datos exitosos
+      setRequests(requestsResult.data?.requests || [])
+      setStats(statsResult.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch dashboard data')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data'
+      console.error('Dashboard data fetch error:', errorMessage)
+      setError(errorMessage)
+      
+      // Set default empty state on error
+      setRequests([])
+      setStats({ total: 0, pending: 0, approved: 0, rejected: 0 })
     } finally {
       setLoading(false)
     }
-  }, [userRole, userEmail])
+  }
 
   useEffect(() => {
-    if (userRole && userEmail) {
-      fetchData()
-    }
-  }, [fetchData, userRole, userEmail])
+    fetchData()
+  }, [userRole, userEmail]) // Se ejecuta cuando cambian, pero si userRole=null no hace nada
+
+  const refetch = () => {
+    fetchData()
+  }
 
   return {
     requests,
     stats,
     loading,
     error,
-    refetch: fetchData
+    refetch
   }
 }
