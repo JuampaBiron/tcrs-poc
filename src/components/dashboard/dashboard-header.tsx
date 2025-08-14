@@ -1,83 +1,46 @@
-"use client"
+"use client";
 
-import { User } from "next-auth"
-import { Bell, HelpCircle, Menu, Settings, X } from "lucide-react"
-import FinningLogo from "../ui/finning-logo"
-import { getRoleDisplayName } from "@/lib/auth-utils"
-import { UserRole } from "@/types"
+import { User } from "next-auth";
+import { UserRole } from "@/types";
+import SignOutButton from "../ui/sign-out-button";
+import Link from "next/link";
 
 interface DashboardHeaderProps {
-  user: User
-  userRole: UserRole
-  sidebarOpen: boolean
-  setSidebarOpen: (open: boolean) => void
+  user: User;
+  userRole: UserRole;
 }
 
 export default function DashboardHeader({
   user,
-  userRole,
-  sidebarOpen,
-  setSidebarOpen
+  userRole
 }: DashboardHeaderProps) {
   return (
-    <header className="bg-white border-b-2 border-gray-200 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Left side */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="sm:hidden p-2 rounded-lg hover:bg-gray-100"
-              aria-label={sidebarOpen ? "Close menu" : "Open menu"}
-            >
-              {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-            
-            <FinningLogo />
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-gray-900">TCRS Approval System</h1>
-              <p className="text-sm text-gray-600">Invoice Approval Dashboard</p>
-            </div>
-          </div>
+    <header className="bg-white shadow-sm border-b">
+      <div className="flex items-center justify-between px-6 py-4">
+        <Link href="/dashboard" className="flex items-center space-x-3 group">
+          <img
+            src="/finning-cat-logo.png"
+            alt="Finning CAT Logo"
+            className="h-10 w-auto group-hover:scale-105 transition-transform"
+            style={{ maxWidth: 200 }}
+          />
+          <span className="text-xl font-semibold text-gray-900 group-hover:text-amber-600 transition-colors">
+            TCRS Approval System
+          </span>
+        </Link>
 
-          {/* Right side */}
-          <div className="flex items-center gap-4">
-            <button 
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-              aria-label="Notifications"
-            >
-              <Bell className="w-6 h-6" />
-            </button>
-            <button 
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-              aria-label="Help"
-            >
-              <HelpCircle className="w-6 h-6" />
-            </button>
-            <button 
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-              aria-label="Settings"
-            >
-              <Settings className="w-6 h-6" />
-            </button>
-            
-            {/* User info */}
-            <div className="flex items-center gap-3 pl-4 border-l-2 border-gray-200">
-              {user.image && (
-                <img 
-                  src={user.image} 
-                  alt={user.name || "User"} 
-                  className="w-8 h-8 rounded-full"
-                />
-              )}
-              <div className="hidden sm:block text-right">
-                <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                <div className="text-xs text-gray-500">{getRoleDisplayName(userRole)}</div>
-              </div>
-            </div>
+        <div className="flex items-center space-x-6">
+          <div className="flex flex-col items-end text-sm">
+            <span className="font-semibold text-gray-800">{user.name}</span>
+            <span className="text-xs text-gray-500">{user.email}</span>
+            <span className="text-xs mt-1 px-2 py-0.5 rounded bg-amber-100 text-amber-700 font-medium">
+              {userRole}
+            </span>
           </div>
+          <div className="h-8 border-l border-gray-200 mx-2" />
+          <SignOutButton />
         </div>
       </div>
     </header>
-  )
+  );
 }

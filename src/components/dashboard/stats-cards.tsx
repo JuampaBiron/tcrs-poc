@@ -1,145 +1,163 @@
-import { USER_ROLES } from "@/constants"
-import { UserRole } from "@/types"
+// src/components/dashboard/stats-cards.tsx
+"use client";
 
-interface StatCard {
-  title: string
-  count: number
-  subtitle?: string
-  bgColor: string
-  textColor: string
-  icon: string
+import { FileText, Clock, CheckCircle } from "lucide-react";
+import { UserRole } from "@/types";
+import { USER_ROLES } from "@/constants";
+
+interface Stats {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
 }
 
 interface StatsCardsProps {
-  userRole?: UserRole
-  stats: {
-    total: number
-    pending: number
-    approved: number
-    rejected: number
-  }
+  userRole: UserRole;
+  stats: Stats;
 }
 
-export default function StatsCards({ userRole = USER_ROLES.REQUESTER, stats }: StatsCardsProps) {
-  
-  const getStatsForRole = (role: string): StatCard[] => {
+export default function StatsCards({ userRole, stats }: StatsCardsProps) {
+  const getStatsForRole = (role: UserRole) => {
+    const completionRate = stats.total > 0 
+      ? Math.round(((stats.approved + stats.rejected) / stats.total) * 100) 
+      : 0;
+
     switch (role) {
-      case USER_ROLES.APPROVER:
-        return [
-          {
-            title: "Requests to be reviewed",
-            count: stats.pending,
-            subtitle: stats.pending > 0 ? "Awaiting your approval" : "All caught up!",
-            bgColor: "bg-amber-50",
-            textColor: "text-amber-800",
-            icon: "👀"
-          },
-          {
-            title: "Approved Requests", 
-            count: stats.approved,
-            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected requests` : "Great job!",
-            bgColor: "bg-green-50",
-            textColor: "text-green-800", 
-            icon: "✅"
-          },
-          {
-            title: "Total Handled",
-            count: stats.approved + stats.rejected,
-            subtitle: "This period",
-            bgColor: "bg-blue-50",
-            textColor: "text-blue-800",
-            icon: "📊"
-          }
-        ]
       case USER_ROLES.ADMIN:
         return [
           {
             title: "Total Requests",
-            count: stats.total,
+            value: stats.total,
             subtitle: "All time",
-            bgColor: "bg-purple-50",
-            textColor: "text-purple-800",
-            icon: "📊"
+            color: "purple",
+            icon: FileText
           },
           {
-            title: "Pending Review",
-            count: stats.pending,
-            subtitle: "Needs attention", 
-            bgColor: "bg-orange-50",
-            textColor: "text-orange-800",
-            icon: "⏳"
+            title: "Pending Review", 
+            value: stats.pending,
+            subtitle: "Needs attention",
+            color: "orange",
+            icon: Clock
           },
           {
             title: "Completion Rate",
-            count: stats.total > 0 ? Math.round(((stats.approved + stats.rejected) / stats.total) * 100) : 0,
+            value: `${completionRate}%`,
             subtitle: "% Processed",
-            bgColor: "bg-emerald-50",
-            textColor: "text-emerald-800",
-            icon: "🎯"
+            color: "teal",
+            icon: CheckCircle
           }
-        ]
-      default: // requester
+        ];
+      
+      case USER_ROLES.APPROVER:
+        return [
+          {
+            title: "Requests to Review",
+            value: stats.pending,
+            subtitle: stats.pending > 0 ? "Awaiting your approval" : "All caught up!",
+            color: "orange",
+            icon: Clock
+          },
+          {
+            title: "Approved Requests",
+            value: stats.approved,
+            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected` : "Great job!",
+            color: "teal",
+            icon: CheckCircle
+          },
+          {
+            title: "Total Handled",
+            value: stats.approved + stats.rejected,
+            subtitle: "This period",
+            color: "purple",
+            icon: FileText
+          }
+        ];
+      
+      default: // USER_ROLES.REQUESTER
         return [
           {
             title: "Your Requests",
-            count: stats.total,
+            value: stats.total,
             subtitle: `${stats.approved + stats.rejected} completed`,
-            bgColor: "bg-yellow-50",
-            textColor: "text-yellow-800", 
-            icon: "📄"
+            color: "purple",
+            icon: FileText
           },
           {
             title: "Pending Approval",
-            count: stats.pending,
+            value: stats.pending,
             subtitle: "Awaiting review",
-            bgColor: "bg-orange-50", 
-            textColor: "text-orange-800",
-            icon: "⏳"
+            color: "orange",
+            icon: Clock
           },
           {
             title: "Approved",
-            count: stats.approved,
-            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected` : "All approved!", 
-            bgColor: "bg-green-50",
-            textColor: "text-green-800",
-            icon: "✅"
+            value: stats.approved,
+            subtitle: stats.rejected > 0 ? `${stats.rejected} rejected` : "All approved!",
+            color: "teal",
+            icon: CheckCircle
           }
-        ]
+        ];
     }
-  }
+  };
 
-  const cards = getStatsForRole(userRole)
+  const getColorClasses = (color: string) => {
+    switch (color) {
+      case "purple":
+        return {
+          bg: "bg-purple-100",
+          text: "text-purple-600",
+          border: "border-purple-200"
+        };
+      case "orange":
+        return {
+          bg: "bg-orange-100",
+          text: "text-orange-600",
+          border: "border-orange-200"
+        };
+      case "teal":
+        return {
+          bg: "bg-teal-100",
+          text: "text-teal-600",
+          border: "border-teal-200"
+        };
+      default:
+        return {
+          bg: "bg-gray-100",
+          text: "text-gray-600",
+          border: "border-gray-200"
+        };
+    }
+  };
+
+  const cards = getStatsForRole(userRole);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      {cards.map((card, index) => (
-        <div
-          key={index}
-          className={`${card.bgColor} rounded-xl p-6 border-2 border-gray-200 hover:border-yellow-300 transition-all duration-200 hover:shadow-lg`}
-        >
-          <div className="flex items-start justify-between mb-4">
-            <div className="text-3xl">{card.icon}</div>
-            <div className="text-right">
-              <div className={`text-3xl font-bold ${card.textColor}`}>
-                {typeof card.count === 'number' && card.count % 1 !== 0 
-                  ? card.count.toFixed(1) 
-                  : card.count}
+      {cards.map((card, index) => {
+        const Icon = card.icon;
+        const colors = getColorClasses(card.color);
+        
+        return (
+          <div
+            key={index}
+            className="bg-white rounded-lg shadow-sm p-6 border"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <div className={`text-2xl font-bold ${colors.text}`}>
+                  {card.value}
+                </div>
+                <div className="text-sm text-gray-600 mt-1">{card.title}</div>
+                <div className="text-xs text-gray-500 mt-1">{card.subtitle}</div>
+              </div>
+              <div className={`p-3 ${colors.bg} rounded-lg`}>
+                <Icon className={colors.text} size={24} />
               </div>
             </div>
           </div>
-          
-          <div>
-            <h3 className={`font-semibold text-lg ${card.textColor} mb-2`}>
-              {card.title}
-            </h3>
-            {card.subtitle && (
-              <p className="text-gray-600 text-sm">
-                {card.subtitle}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
-  )
+  );
 }

@@ -1,194 +1,185 @@
-"use client"
+// src/components/dashboard/search-filters.tsx
+"use client";
 
-import { useState } from "react"
-import { Search, Filter, Download, X } from "lucide-react"
-
-import { UserRole, FilterState } from "@/types"
-import { FILTER_OPTIONS, USER_ROLES } from "@/constants"
+import { Search, Filter, Download, X } from "lucide-react";
+import { FilterState, UserRole } from "@/types";
+import { REQUEST_STATUS } from "@/constants";
+import { useState } from "react";
 
 interface SearchFiltersProps {
-  onSearch: (query: string) => void
-  onFilterChange: (filters: FilterState) => void
-  onExport: () => void
-  userRole?: UserRole
-  exportLoading?: boolean
+  onSearch: (query: string) => void;
+  onFilterChange: (filters: FilterState) => void;
+  onExport: () => void;
+  onClearFilters: () => void; // Nueva función para limpiar filtros
+  userRole: UserRole;
+  exportLoading: boolean;
+  requestsCount?: number;
+  currentFilters: FilterState; // Estado actual de filtros
 }
 
-export default function SearchFilters({ 
-  onSearch, 
-  onFilterChange, 
+export default function SearchFilters({
+  onSearch,
+  onFilterChange,
   onExport,
-  userRole = USER_ROLES.REQUESTER,
-  exportLoading = false
+  onClearFilters,
+  userRole,
+  exportLoading,
+  requestsCount = 0,
+  currentFilters
 }: SearchFiltersProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState<FilterState>({
-    status: "",
-    dateRange: "",
-    amount: "",
-    branch: ""
-  })
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const query = e.target.value
-    setSearchQuery(query)
-    onSearch(query)
-  }
+    const value = e.target.value;
+    setSearchTerm(value);
+    onSearch(value);
+  };
 
   const handleFilterChange = (key: keyof FilterState, value: string) => {
-    const newFilters = { ...filters, [key]: value }
-    setFilters(newFilters)
-    onFilterChange(newFilters)
-  }
+    const newFilters = { ...currentFilters, [key]: value };
+    onFilterChange(newFilters);
+  };
 
-  const clearFilters = () => {
-    const emptyFilters = { status: "", dateRange: "", amount: "", branch: "" }
-    setFilters(emptyFilters)
-    onFilterChange(emptyFilters)
-  }
+  const handleClearFilters = () => {
+    setSearchTerm("");
+    onSearch("");
+    onClearFilters();
+  };
 
-  const activeFiltersCount = Object.values(filters).filter(value => value !== "").length
+  // Verificar si hay filtros aplicados
+  const hasActiveFilters = searchTerm || 
+    currentFilters.status || 
+    currentFilters.dateRange || 
+    currentFilters.amount || 
+    currentFilters.branch;
+
+  // Contar filtros activos para mostrar en el botón de exportar
+  const activeFiltersCount = [
+    currentFilters.status,
+    currentFilters.dateRange, 
+    currentFilters.amount,
+    currentFilters.branch
+  ].filter(Boolean).length + (searchTerm ? 1 : 0);
 
   return (
-    <div className="bg-white rounded-xl p-6 border-2 border-gray-200 mb-6">
-      {/* Main Search Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            placeholder="Search requests..."
-            value={searchQuery}
-            onChange={handleSearchChange}
-            className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none transition-colors"
-          />
-        </div>
-        
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
-              showFilters || activeFiltersCount > 0
-                ? 'bg-yellow-400 border-yellow-400 text-black' 
-                : 'bg-gray-50 border-gray-200 text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <Filter className="w-5 h-5" />
-            Filters
-            {activeFiltersCount > 0 && (
-              <span className="bg-black text-white text-xs px-2 py-1 rounded-full">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
-          
-          <button
-            onClick={onExport}
-            disabled={exportLoading}
-            className="flex items-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:bg-green-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-          >
-            <Download className={`w-5 h-5 ${exportLoading ? 'animate-spin' : ''}`} />
-            {exportLoading ? 'Exporting...' : 'Export'}
-          </button>
+    <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      <div className="flex flex-col lg:flex-row gap-4 mb-4">
+        <div className="flex-1">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search requests..."
+              value={searchTerm}
+              onChange={handleSearchChange}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      {/* Filters Panel */}
-      {showFilters && (
-        <div className="border-t-2 border-gray-100 pt-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-gray-800">Filter Options</h3>
-            {activeFiltersCount > 0 && (
-              <button
-                onClick={clearFilters}
-                className="flex items-center gap-1 text-red-600 hover:text-red-700 text-sm"
-              >
-                <X className="w-4 h-4" />
-                Clear all
-              </button>
-            )}
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                value={filters.status}
-                onChange={(e) => handleFilterChange('status', e.target.value)}
-                className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
-              >
-                <option value="">All Status</option>
-                {FILTER_OPTIONS.STATUSES.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Date Range Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Date Range
-              </label>
-              <select
-                value={filters.dateRange}
-                onChange={(e) => handleFilterChange('dateRange', e.target.value)}
-                className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
-              >
-                <option value="">All Dates</option>
-                {FILTER_OPTIONS.DATE_RANGES.map((range) => (
-                  <option key={range.value} value={range.value}>
-                    {range.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Amount Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Amount Range
-              </label>
-              <select
-                value={filters.amount}
-                onChange={(e) => handleFilterChange('amount', e.target.value)}
-                className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
-              >
-                <option value="">All Amounts</option>
-                {FILTER_OPTIONS.AMOUNTS.map((amount) => (
-                  <option key={amount.value} value={amount.value}>
-                    {amount.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Branch Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Branch
-              </label>
-              <select
-                value={filters.branch}
-                onChange={(e) => handleFilterChange('branch', e.target.value)}
-                className="w-full p-2 border-2 border-gray-200 rounded-lg focus:border-yellow-400 focus:outline-none"
-              >
-                <option value="">All Branches</option>
-                {FILTER_OPTIONS.BRANCHES.map((branch) => (
-                  <option key={branch.value} value={branch.value}>
-                    {branch.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select 
+            value={currentFilters.status}
+            onChange={(e) => handleFilterChange("status", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Status</option>
+            <option value={REQUEST_STATUS.APPROVED}>Approved</option>
+            <option value={REQUEST_STATUS.PENDING}>Pending</option>
+            <option value={REQUEST_STATUS.IN_REVIEW}>In Review</option>
+            <option value={REQUEST_STATUS.REJECTED}>Rejected</option>
+          </select>
         </div>
-      )}
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+          <select 
+            value={currentFilters.dateRange}
+            onChange={(e) => handleFilterChange("dateRange", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Dates</option>
+            <option value="last7days">Last 7 days</option>
+            <option value="last30days">Last 30 days</option>
+            <option value="last90days">Last 90 days</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Amount Range</label>
+          <select 
+            value={currentFilters.amount}
+            onChange={(e) => handleFilterChange("amount", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Amounts</option>
+            <option value="under1000">Under $1,000</option>
+            <option value="1000to5000">$1,000 - $5,000</option>
+            <option value="over5000">Over $5,000</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+          <select 
+            value={currentFilters.branch}
+            onChange={(e) => handleFilterChange("branch", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Branches</option>
+            <option value="branch1">Branch 1</option>
+            <option value="branch2">Branch 2</option>
+            <option value="sitech">Sitech</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-center">
+        <div className="flex items-center space-x-4">
+          <div className="text-sm text-gray-600">
+            Showing {requestsCount} requests
+          </div>
+          {hasActiveFilters && (
+            <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+              {activeFiltersCount} filter{activeFiltersCount !== 1 ? 's' : ''} applied
+            </div>
+          )}
+        </div>
+        <div className="flex space-x-2">
+          {hasActiveFilters && (
+            <button 
+              onClick={handleClearFilters}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              <X size={16} />
+              <span>Clear Filters</span>
+            </button>
+          )}
+          <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <Filter size={16} />
+            <span>Filter</span>
+          </button>
+          <button 
+            onClick={onExport}
+            disabled={exportLoading}
+            className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            title={hasActiveFilters ? `Export ${requestsCount} filtered requests` : `Export all ${requestsCount} requests`}
+          >
+            <Download size={16} />
+            <span>
+              {exportLoading 
+                ? "Exporting..." 
+                : hasActiveFilters 
+                  ? `Export Filtered (${requestsCount})` 
+                  : "Export All"
+              }
+            </span>
+          </button>
+        </div>
+      </div>
     </div>
-  )
+  );
 }

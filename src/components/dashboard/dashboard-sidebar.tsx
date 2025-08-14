@@ -1,51 +1,69 @@
-"use client"
+// src/components/dashboard/dashboard-sidebar.tsx
+"use client";
 
-import SignOutButton from "../ui/sign-out-button"
+import { BarChart3, FileText, Settings } from "lucide-react";
+import { UserRole } from "@/types";
+import { USER_ROLES } from "@/constants";
 
 interface DashboardSidebarProps {
-  isOpen: boolean
-  onClose: () => void
+  activeView: string;
+  onViewChange: (view: string) => void;
+  userRole: UserRole;
 }
 
-export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarProps) {
-  if (!isOpen) return null
+export default function DashboardSidebar({ 
+  activeView, 
+  onViewChange, 
+  userRole 
+}: DashboardSidebarProps) {
+  const canAccessAdmin = userRole === USER_ROLES.ADMIN;
+
+  const navigationItems = [
+    {
+      id: "dashboard",
+      label: "Dashboard",
+      icon: BarChart3,
+      available: true,
+    },
+    {
+      id: "requests",
+      label: "Requests View",
+      icon: FileText,
+      available: true,
+    },
+    {
+      id: "admin",
+      label: "Admin View",
+      icon: Settings,
+      available: canAccessAdmin,
+    },
+  ];
 
   return (
-    <div className="fixed inset-0 z-30 sm:hidden">
-      <div 
-        className="absolute inset-0 bg-gray-600 opacity-75" 
-        onClick={onClose}
-        aria-label="Close sidebar"
-      />
-      <div className="relative flex flex-col w-64 h-full bg-white shadow-xl">
-        <div className="p-6">
-          <h2 className="text-lg font-semibold text-gray-900">Navigation</h2>
-        </div>
-        <nav className="flex-1 px-6 space-y-2" role="navigation">
-          <a 
-            href="#" 
-            className="block px-3 py-2 rounded-lg bg-yellow-100 text-yellow-800 font-medium"
-            aria-current="page"
-          >
-            Dashboard
-          </a>
-          <a 
-            href="#" 
-            className="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
-          >
-            My Requests
-          </a>
-          <a 
-            href="#" 
-            className="block px-3 py-2 rounded-lg text-gray-700 hover:bg-gray-100"
-          >
-            Reports
-          </a>
-        </nav>
-        <div className="p-6 border-t border-gray-200">
-          <SignOutButton />
-        </div>
-      </div>
-    </div>
-  )
+    <aside className="w-64 bg-white shadow-sm min-h-screen border-r">
+      <nav className="p-4 space-y-2">
+        {navigationItems.map((item) => {
+          if (!item.available) return null;
+          
+          const Icon = item.icon;
+          const isActive = activeView === item.id;
+          
+          return (
+            <button
+              key={item.id}
+              onClick={() => onViewChange(item.id)}
+              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                isActive
+                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Icon size={20} />
+              <span className="font-medium">{item.label}</span>
+            </button>
+          );
+        })}
+      </nav>
+    </aside>
+  );
 }

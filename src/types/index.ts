@@ -3,6 +3,13 @@ import { USER_ROLES, REQUEST_STATUS } from '@/constants'
 export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
 export type RequestStatus = typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]
 
+export interface ExportParams {
+  role: UserRole;
+  email: string;
+  filters: FilterState;
+  searchQuery?: string;
+}
+
 // Actualizar User interface para incluir groups
 export interface User {
   id?: string

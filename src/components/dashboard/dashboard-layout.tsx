@@ -1,6 +1,6 @@
-// src\components\dashboard\dashboard-layout.tsx
+// src/components/dashboard/dashboard-layout.tsx
 "use client";
- 
+
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import {
   apiClient,
@@ -8,30 +8,26 @@ import {
   generateExportFilename,
 } from "@/lib/api-client";
 import { FilterState, Stats, UserRole } from "@/types";
+import { USER_ROLES } from "@/constants";
 import { User } from "next-auth";
 import { useState } from "react";
- 
+
 // Components
 import ErrorMessage from "../ui/error-message";
-import FinningLogo from "../ui/finning-logo";
 import LoadingSpinner from "../ui/loading-spinner";
-import SignOutButton from "../ui/sign-out-button";
-import CreateRequestButton from "./create-request-button";
 import DashboardHeader from "./dashboard-header";
 import DashboardSidebar from "./dashboard-sidebar";
 import RequestsTable from "./requests-table";
 import SearchFilters from "./search-filters";
 import StatsCards from "./stats-cards";
-import WelcomeSection from "./welcome-section";
- 
-// The user object from the session now includes the role.
-// We must update our types to reflect this.
+
 interface DashboardLayoutProps {
   user: User & { role: UserRole };
 }
- 
+
 export default function DashboardLayout({ user }: DashboardLayoutProps) {
-  // State management for UI, not for auth
+  // State management
+  const [activeView, setActiveView] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({
     status: "",
@@ -39,42 +35,56 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     amount: "",
     branch: "",
   });
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
- 
-  // Get user role directly from the prop! No more hooks or state.
+
   const userRole = user.role;
- 
-  // Hook de datos uses the role directly.
-  // It won't run until the role is available, which is immediately.
+
+  // Data fetching
   const { requests, stats, loading, error, refetch } = useDashboardData({
     userRole: userRole,
     userEmail: user.email || "",
   });
- 
-  // No more `isClient` or `authorizationState` checks are needed here.
-  // The parent server component has already handled it.
- 
+
+  // Handlers
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
- 
+
   const handleFilterChange = (newFilters: FilterState) => {
     setFilters(newFilters);
   };
- 
+
+  const handleClearFilters = () => {
+    setFilters({
+      status: "",
+      dateRange: "",
+      amount: "",
+      branch: "",
+    });
+    setSearchQuery("");
+  };
+
   const handleExport = async () => {
     if (!user.email) return;
- 
+
     try {
       setExportLoading(true);
-      const result = await apiClient.exportData(userRole, user.email, filters);
- 
+      
+      // Crear objeto de filtros extendido que incluye la búsqueda
+      const exportFilters = {
+        ...filters,
+        searchQuery: searchQuery
+      };
+      
+      // Nota: Necesitarás actualizar la función apiClient.exportData 
+      // para aceptar searchQuery como parte de los filtros
+      const result = await apiClient.exportData(userRole, user.email, exportFilters);
+
       if (result.error) {
         console.error("Export failed:", result.error);
         return;
       }
- 
+
       if (result.data) {
         downloadFile(result.data, generateExportFilename());
       }
@@ -84,11 +94,15 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       setExportLoading(false);
     }
   };
- 
+
   const handleCreateRequest = () => {
     console.log("Navigate to create request form");
   };
- 
+
+  const handleViewChange = (view: string) => {
+    setActiveView(view);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -97,7 +111,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       </div>
     );
   }
- 
+
   // Error state
   if (error) {
     return (
@@ -108,72 +122,68 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       </div>
     );
   }
- 
+
   // Main dashboard render
   return (
     <div className="min-h-screen bg-gray-50">
-      <DashboardHeader
-        user={user}
-        userRole={userRole}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-      />
- 
-      <DashboardSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
- 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <WelcomeSection
-          user={user}
+      {/* Header */}
+      <DashboardHeader user={user} userRole={userRole} />
+
+      <div className="flex">
+        {/* Sidebar */}
+        <DashboardSidebar 
+          activeView={activeView}
+          onViewChange={handleViewChange}
           userRole={userRole}
-          stats={stats as Stats}
         />
- 
-        <StatsCards userRole={userRole} stats={stats as Stats} />
- 
-        <div className="mb-8">
-          <CreateRequestButton
-            userRole={userRole}
-            onCreateRequest={handleCreateRequest}
-          />
-        </div>
- 
-        <SearchFilters
-          onSearch={handleSearch}
-          onFilterChange={handleFilterChange}
-          onExport={handleExport}
-          userRole={userRole}
-          exportLoading={exportLoading}
-        />
- 
-        <RequestsTable
-          userRole={userRole}
-          requests={requests}
-          searchQuery={searchQuery}
-          filters={filters}
-          onRefresh={refetch}
-        />
- 
-        <footer className="mt-12 pt-8 border-t-2 border-gray-200 text-center">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <FinningLogo />
-              <div className="text-left">
-                <p className="text-sm text-gray-600">TCRS Approval System</p>
-                <p className="text-xs text-gray-500">
-                  Powered by Sisua Digital
-                </p>
-              </div>
+
+        {/* Main Content */}
+        <main className="flex-1 p-6">
+          {activeView === "dashboard" && (
+            <>
+              {/* Dashboard Metrics */}
+              <StatsCards userRole={userRole} stats={stats as Stats} />
+
+              {/* Search and Filters */}
+              <SearchFilters
+                onSearch={handleSearch}
+                onFilterChange={handleFilterChange}
+                onExport={handleExport}
+                onClearFilters={handleClearFilters}
+                userRole={userRole}
+                exportLoading={exportLoading}
+                requestsCount={requests?.length || 0}
+                currentFilters={filters}
+              />
+
+              {/* Requests Table */}
+              <RequestsTable
+                userRole={userRole}
+                requests={requests}
+                searchQuery={searchQuery}
+                filters={filters}
+                onRefresh={refetch}
+              />
+            </>
+          )}
+
+          {activeView === "requests" && (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="text-6xl mb-4">📋</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Requests View</h3>
+              <p className="text-gray-600">Esta vista se implementará próximamente.</p>
             </div>
- 
-            <div className="flex gap-4">
-              <SignOutButton />
+          )}
+
+          {activeView === "admin" && userRole === USER_ROLES.ADMIN && (
+            <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+              <div className="text-6xl mb-4">⚙️</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">Admin View</h3>
+              <p className="text-gray-600">Panel de administración disponible próximamente.</p>
             </div>
-          </div>
-        </footer>
-      </main>
+          )}
+        </main>
+      </div>
     </div>
   );
 }
