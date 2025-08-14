@@ -1,48 +1,51 @@
-// src/auth.ts - SOLUCIÓN FINAL
+// src/auth.ts - REEMPLAZAR TODO EL ARCHIVO
 import NextAuth from "next-auth"
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
-// REMOVER: import { DrizzleAdapter } from "@auth/drizzle-adapter"
-// REMOVER: import { db } from "@/db"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  // REMOVER: adapter: DrizzleAdapter(db),
   session: {
-    strategy: "jwt"  // CRÍTICO: Usar JWT strategy
+    strategy: "jwt"
+  },
+  cookies: {
+    sessionToken: {
+      name: `next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: process.env.NODE_ENV === "production",
+      }
+    },  
   },
   providers: [
     MicrosoftEntraID({
       clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID!,
       clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET!,
+      issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER!,
       authorization: {
         params: {
           scope: "openid profile email User.Read"
         }
-      }
+      },
+      checks: ["state"]  // Solo state, sin PKCE
     }),
   ],
   callbacks: {
     signIn: async ({ user, account, profile }) => {
       console.log('🔍 SIGNIN CALLBACK')
+      console.log('User:', user.email)
+      console.log('Provider:', account?.provider)
       
-      // Domain validation
-      const allowedDomainsEnv = process.env.ALLOWED_EMAIL_DOMAINS
-      if (!allowedDomainsEnv) {
-        console.error('ALLOWED_EMAIL_DOMAINS environment variable not configured')
+      // Solo verificar que sea el provider correcto (sin validación de dominio)
+      const isCorrectProvider = account?.provider === 'microsoft-entra-id'
+      
+      if (!isCorrectProvider) {
+        console.warn(`Sign-in rejected - wrong provider: ${account?.provider}`)
         return false
       }
       
-      const allowedDomains = allowedDomainsEnv.split(',').map(domain => domain.trim())
-      const isAllowedDomain = allowedDomains.some(domain => 
-        user.email?.toLowerCase().endsWith(domain.toLowerCase())
-      )
-      
-      const isCorrectTenant = account?.provider === 'microsoft-entra-id'
-      
-      if (!isAllowedDomain) {
-        console.warn(`Sign-in rejected for domain: ${user.email}`)
-      }
-      
-      return isAllowedDomain && isCorrectTenant
+      console.log('✅ SIGNIN CALLBACK - Login approved for:', user.email)
+      return true
     },
     
     jwt: async ({ token, account, profile }) => {
