@@ -1,28 +1,21 @@
-// src\app\dashboard\page.tsx
-// FINAL, TYPE-SAFE VERSION
- 
+// src/app/dashboard/page.tsx
 import { auth } from "@/auth";
 import DashboardLayout from "@/components/dashboard/dashboard-layout";
 import SignOutButton from "@/components/ui/sign-out-button";
-import { isValidUserRole } from "@/constants"; // <-- IMPORT THE TYPE GUARD
+import { isValidUserRole } from "@/constants";
 import { redirect } from "next/navigation";
- 
+
 export const metadata = {
   title: "Dashboard - TCRS POC",
   description: "TCRS Invoice Approval Dashboard",
 };
- 
+
 export default async function DashboardPage() {
   const session = await auth();
- 
-  // 1. Get the role from the session. It's currently 'string | undefined'.
   const userRole = session?.user?.role;
- 
-  // 2. Use the type guard to check if the role is valid.
-  // This check is now more robust. It ensures the role is not only present
-  // but is one of the allowed values ('admin', 'approver', 'requester').
+
+  // Validate user session and role
   if (!session?.user || !isValidUserRole(userRole)) {
-    // If the user is logged in but has an invalid/missing role...
     if (session?.user) {
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -44,13 +37,10 @@ export default async function DashboardPage() {
         </div>
       );
     }
-    // If there's no session at all, redirect to login.
     redirect("/");
   }
- 
-  // 3. Pass the user object to the layout.
-  // Inside this code block, TypeScript now knows that `userRole` is of type `UserRole`.
-  // We explicitly construct the user prop to satisfy the component's expectation.
+
+  // Render the new dashboard layout
   return (
     <DashboardLayout
       user={{
@@ -60,4 +50,3 @@ export default async function DashboardPage() {
     />
   );
 }
- 

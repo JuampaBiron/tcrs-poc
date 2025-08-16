@@ -1,7 +1,7 @@
 // src/components/dashboard/search-filters.tsx
 "use client";
 
-import { Search, Filter, Download, X } from "lucide-react";
+import { Search, Download, X } from "lucide-react";
 import { FilterState, UserRole } from "@/types";
 import { REQUEST_STATUS } from "@/constants";
 import { useState } from "react";
@@ -13,8 +13,8 @@ interface SearchFiltersProps {
   onClearFilters: () => void;
   userRole: UserRole;
   exportLoading: boolean;
-  requestsCount?: number; // Número de requests filtrados/mostrados
-  totalRequestsCount?: number; // Número total de requests (NUEVO)
+  requestsCount?: number;
+  totalRequestsCount?: number;
   currentFilters: FilterState;
 }
 
@@ -55,7 +55,7 @@ export default function SearchFilters({
     currentFilters.amount || 
     currentFilters.branch;
 
-  // Contar filtros activos para mostrar en el botón de exportar
+  // Contar filtros activos
   const activeFiltersCount = [
     currentFilters.status,
     currentFilters.dateRange, 
@@ -65,6 +65,7 @@ export default function SearchFilters({
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+      {/* Search Bar */}
       <div className="flex flex-col lg:flex-row gap-4 mb-4">
         <div className="flex-1">
           <div className="relative">
@@ -80,6 +81,7 @@ export default function SearchFilters({
         </div>
       </div>
 
+      {/* Filter Options */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -139,6 +141,7 @@ export default function SearchFilters({
         </div>
       </div>
 
+      {/* Footer with results count and actions */}
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
@@ -154,6 +157,8 @@ export default function SearchFilters({
             </div>
           )}
         </div>
+        
+        {/* Action buttons */}
         <div className="flex space-x-2">
           {hasActiveFilters && (
             <button 
@@ -164,10 +169,6 @@ export default function SearchFilters({
               <span>Clear Filters</span>
             </button>
           )}
-          <button className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-            <Filter size={16} />
-            <span>Filter</span>
-          </button>
           <button 
             onClick={onExport}
             disabled={exportLoading}

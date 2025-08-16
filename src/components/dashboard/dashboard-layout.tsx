@@ -15,8 +15,7 @@ import { useState, useMemo } from "react";
 // Components
 import ErrorMessage from "../ui/error-message";
 import LoadingSpinner from "../ui/loading-spinner";
-import DashboardHeader from "./dashboard-header";
-import DashboardSidebar from "./dashboard-sidebar";
+import NewSidebar from "./dashboard-sidebar";
 import RequestsTable from "./requests-table";
 import SearchFilters from "./search-filters";
 import StatsCards from "./stats-cards";
@@ -29,6 +28,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
   // State management
   const [activeView, setActiveView] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
     status: "",
     dateRange: "",
@@ -45,7 +45,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     userEmail: user.email || "",
   });
 
-  // ✅ CALCULAR REQUESTS FILTRADOS para mostrar el número correcto
+  // Filtered requests calculation
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
     
@@ -57,20 +57,16 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
       const matchesStatus = filters.status ? request.status === filters.status : true;
       const matchesBranch = filters.branch ? request.branch === filters.branch : true;
       
-      // Para amount, necesitamos extraer el monto del título (como en el backend)
       const matchesAmount = filters.amount ? (() => {
         const amountMatch = request.title.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i);
-        const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+        const amount = amountMatch ? 
+          parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
         
         switch (filters.amount) {
-          case 'under1000':
-            return amount < 1000;
-          case '1000to5000':
-            return amount >= 1000 && amount <= 5000;
-          case 'over5000':
-            return amount > 5000;
-          default:
-            return true;
+          case 'under1000': return amount < 1000;
+          case '1000to5000': return amount >= 1000 && amount <= 5000;
+          case 'over5000': return amount > 5000;
+          default: return true;
         }
       })() : true;
       
@@ -78,7 +74,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     });
   }, [requests, searchQuery, filters]);
 
-  // Handlers
+  // Event handlers
   const handleSearch = (query: string) => {
     setSearchQuery(query);
   };
@@ -99,18 +95,14 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
 
   const handleExport = async () => {
     if (!user.email) return;
-
+    
+    setExportLoading(true);
     try {
-      setExportLoading(true);
-      
-      // Crear objeto de filtros extendido que incluye la búsqueda
       const exportFilters = {
         ...filters,
         searchQuery: searchQuery
       };
       
-      // Nota: Necesitarás actualizar la función apiClient.exportData 
-      // para aceptar searchQuery como parte de los filtros
       const result = await apiClient.exportData(userRole, user.email, exportFilters);
 
       if (result.error) {
@@ -136,6 +128,10 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     setActiveView(view);
   };
 
+  const toggleSidebar = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
+  };
+
   // Loading state
   if (loading) {
     return (
@@ -158,22 +154,30 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
 
   // Main dashboard render
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <DashboardHeader user={user} userRole={userRole} />
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* New Sidebar */}
+      <NewSidebar 
+        user={user}
+        userRole={userRole}
+        activeView={activeView}
+        onViewChange={handleViewChange}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleSidebar}
+      />
 
-      <div className="flex">
-        {/* Sidebar */}
-        <DashboardSidebar 
-          activeView={activeView}
-          onViewChange={handleViewChange}
-          userRole={userRole}
-        />
-
-        {/* Main Content */}
-        <main className="flex-1 p-6">
+      {/* Main Content Panel */}
+      <main className={`flex-1 transition-all duration-300 ${
+        sidebarCollapsed ? 'ml-16' : 'ml-80'
+      }`}>
+        <div className="p-6">
           {activeView === "dashboard" && (
             <>
+              {/* Page Title */}
+              <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-600">Overview of your approval requests</p>
+              </div>
+
               {/* Dashboard Metrics */}
               <StatsCards userRole={userRole} stats={stats as Stats} />
 
@@ -181,19 +185,19 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
               <SearchFilters
                 onSearch={handleSearch}
                 onFilterChange={handleFilterChange}
-                onExport={handleExport}
                 onClearFilters={handleClearFilters}
+                onExport={handleExport}
                 userRole={userRole}
                 exportLoading={exportLoading}
-                requestsCount={filteredRequests.length}
+                requestsCount={filteredRequests?.length || 0}
                 totalRequestsCount={requests?.length || 0}
                 currentFilters={filters}
               />
 
               {/* Requests Table */}
-              <RequestsTable
+              <RequestsTable 
+                requests={filteredRequests || []}
                 userRole={userRole}
-                requests={filteredRequests}
                 searchQuery={searchQuery}
                 filters={filters}
                 onRefresh={refetch}
@@ -205,7 +209,7 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-6xl mb-4">📋</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Requests View</h3>
-              <p className="text-gray-600">Esta vista se implementará próximamente.</p>
+              <p className="text-gray-600">This page will be implemented with separate routing based on user roles.</p>
             </div>
           )}
 
@@ -213,11 +217,11 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
             <div className="bg-white rounded-lg shadow-sm p-8 text-center">
               <div className="text-6xl mb-4">⚙️</div>
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Admin View</h3>
-              <p className="text-gray-600">Panel de administración disponible próximamente.</p>
+              <p className="text-gray-600">Administrative panel will be implemented with separate routing based on user roles.</p>
             </div>
           )}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
