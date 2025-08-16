@@ -58,39 +58,43 @@ class ApiClient {
 
   // Export API
   async exportData(
-    role: UserRole, 
-    email: string, 
-    filters: FilterState
-  ): Promise<{ data: Blob | null; error: string | null }> {
-    try {
-      const response = await fetch(API_ROUTES.EXPORT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ role, email, filters })
-      })
+  role: UserRole, 
+  email: string, 
+  filters: FilterState & { searchQuery?: string }
+    ): Promise<{ data: Blob | null; error: string | null }> {
+      try {
+        console.log('🔄 Exporting with filters:', { role, email, filters });
+        
+        const response = await fetch(API_ROUTES.EXPORT, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ role, email, filters })
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json()
+        if (!response.ok) {
+          const errorData = await response.json()
+          return {
+            data: null,
+            error: errorData.error || 'Export failed'
+          }
+        }
+
+        const blob = await response.blob()
+        console.log('✅ Export successful, blob size:', blob.size);
+        return {
+          data: blob,
+          error: null
+        }
+      } catch (error) {
+        console.error('❌ Export error:', error);
         return {
           data: null,
-          error: errorData.error || 'Export failed'
+          error: error instanceof Error ? error.message : 'Export failed'
         }
       }
-
-      const blob = await response.blob()
-      return {
-        data: blob,
-        error: null
-      }
-    } catch (error) {
-      return {
-        data: null,
-        error: error instanceof Error ? error.message : 'Export failed'
-      }
     }
-  }
 
   // Search API
   async searchRequests(params: {

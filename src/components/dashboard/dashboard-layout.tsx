@@ -10,7 +10,7 @@ import {
 import { FilterState, Stats, UserRole } from "@/types";
 import { USER_ROLES } from "@/constants";
 import { User } from "next-auth";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
 // Components
 import ErrorMessage from "../ui/error-message";
@@ -44,6 +44,39 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
     userRole: userRole,
     userEmail: user.email || "",
   });
+
+  // ✅ CALCULAR REQUESTS FILTRADOS para mostrar el número correcto
+  const filteredRequests = useMemo(() => {
+    if (!requests) return [];
+    
+    return requests.filter(request => {
+      const matchesSearch = searchQuery ? 
+        (request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         (request.requester?.toLowerCase() || '').includes(searchQuery.toLowerCase())) : true;
+      
+      const matchesStatus = filters.status ? request.status === filters.status : true;
+      const matchesBranch = filters.branch ? request.branch === filters.branch : true;
+      
+      // Para amount, necesitamos extraer el monto del título (como en el backend)
+      const matchesAmount = filters.amount ? (() => {
+        const amountMatch = request.title.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i);
+        const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
+        
+        switch (filters.amount) {
+          case 'under1000':
+            return amount < 1000;
+          case '1000to5000':
+            return amount >= 1000 && amount <= 5000;
+          case 'over5000':
+            return amount > 5000;
+          default:
+            return true;
+        }
+      })() : true;
+      
+      return matchesSearch && matchesStatus && matchesBranch && matchesAmount;
+    });
+  }, [requests, searchQuery, filters]);
 
   // Handlers
   const handleSearch = (query: string) => {
@@ -152,14 +185,15 @@ export default function DashboardLayout({ user }: DashboardLayoutProps) {
                 onClearFilters={handleClearFilters}
                 userRole={userRole}
                 exportLoading={exportLoading}
-                requestsCount={requests?.length || 0}
+                requestsCount={filteredRequests.length}
+                totalRequestsCount={requests?.length || 0}
                 currentFilters={filters}
               />
 
               {/* Requests Table */}
               <RequestsTable
                 userRole={userRole}
-                requests={requests}
+                requests={filteredRequests}
                 searchQuery={searchQuery}
                 filters={filters}
                 onRefresh={refetch}

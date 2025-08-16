@@ -1,13 +1,24 @@
+// src/types/index.ts
 import { USER_ROLES, REQUEST_STATUS } from '@/constants'
 
 export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES]
 export type RequestStatus = typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]
 
+// ✅ NUEVOS TIPOS PARA EXPORTACIÓN CON FILTROS
+export interface ExportFilters extends FilterState {
+  searchQuery?: string;
+}
+
 export interface ExportParams {
   role: UserRole;
   email: string;
-  filters: FilterState;
-  searchQuery?: string;
+  filters: ExportFilters;
+}
+
+export interface ExportResponse {
+  data?: Blob;
+  error?: string;
+  message?: string;
 }
 
 // Actualizar User interface para incluir groups

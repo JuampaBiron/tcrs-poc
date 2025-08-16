@@ -10,11 +10,12 @@ interface SearchFiltersProps {
   onSearch: (query: string) => void;
   onFilterChange: (filters: FilterState) => void;
   onExport: () => void;
-  onClearFilters: () => void; // Nueva función para limpiar filtros
+  onClearFilters: () => void;
   userRole: UserRole;
   exportLoading: boolean;
-  requestsCount?: number;
-  currentFilters: FilterState; // Estado actual de filtros
+  requestsCount?: number; // Número de requests filtrados/mostrados
+  totalRequestsCount?: number; // Número total de requests (NUEVO)
+  currentFilters: FilterState;
 }
 
 export default function SearchFilters({
@@ -25,6 +26,7 @@ export default function SearchFilters({
   userRole,
   exportLoading,
   requestsCount = 0,
+  totalRequestsCount,
   currentFilters
 }: SearchFiltersProps) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -140,7 +142,11 @@ export default function SearchFilters({
       <div className="flex justify-between items-center">
         <div className="flex items-center space-x-4">
           <div className="text-sm text-gray-600">
-            Showing {requestsCount} requests
+            {hasActiveFilters && totalRequestsCount ? (
+              <>Showing {requestsCount} of {totalRequestsCount} requests</>
+            ) : (
+              <>Showing {requestsCount} requests</>
+            )}
           </div>
           {hasActiveFilters && (
             <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
