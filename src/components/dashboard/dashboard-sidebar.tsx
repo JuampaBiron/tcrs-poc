@@ -1,10 +1,11 @@
-// src/components/dashboard/dashboard-sidebar.tsx
+// src/components/dashboard/dashboard-sidebar.tsx - MINIMALISTA + CORPORATE FINNING
 "use client";
 
 import { User } from "next-auth";
-import { UserRole } from "@/types";
 import { USER_ROLES } from "@/constants";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 import {
   BarChart3,
   FileText,
@@ -12,52 +13,49 @@ import {
   ChevronLeft,
   ChevronRight,
   Menu,
-  X
+  X,
+  LogOut
 } from "lucide-react";
 import EnhancedSignOutButton from "../ui/sign-out-button";
 
-interface NewSidebarProps {
+// Type derivation from constants
+type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+
+interface DashboardSidebarProps {
   user: User & { role: UserRole };
-  userRole: UserRole;
-  activeView: string;
-  onViewChange: (view: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-export default function NewSidebar({
+export default function DashboardSidebar({
   user,
-  userRole,
-  activeView,
-  onViewChange,
   collapsed,
-  onToggleCollapse
-}: NewSidebarProps) {
+  onToggleCollapse,
+}: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const pathname = usePathname();
+  const userRole = user.role;
 
   const navigationItems = [
     {
+      href: '/dashboard',
       id: 'dashboard',
       label: 'Dashboard',
       icon: BarChart3,
-      color: 'from-blue-500 to-blue-600',
-      hoverColor: 'hover:from-blue-600 hover:to-blue-700',
       available: true
     },
     {
-      id: 'requests',
-      label: 'Requests View',
+      href: '/request',
+      id: 'request',
+      label: 'Request',
       icon: FileText,
-      color: 'from-amber-400 to-amber-500',
-      hoverColor: 'hover:from-amber-500 hover:to-amber-600',
       available: true
     },
     {
+      href: '/admin',
       id: 'admin',
-      label: 'Admin View',
+      label: 'Administration',
       icon: Settings,
-      color: 'from-red-500 to-red-600',
-      hoverColor: 'hover:from-red-600 hover:to-red-700',
       available: userRole === USER_ROLES.ADMIN
     }
   ];
@@ -66,142 +64,170 @@ export default function NewSidebar({
     setMobileOpen(!mobileOpen);
   };
 
-  const handleViewChange = (viewId: string) => {
-    onViewChange(viewId);
-    setMobileOpen(false); // Close mobile menu when selecting a view
+  const handleNavClick = () => {
+    setMobileOpen(false);
   };
 
   return (
     <>
-      {/* Mobile Menu Button - Only visible on mobile */}
+      {/* Mobile Menu Button */}
       <button
         onClick={toggleMobile}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg border"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
       >
-        {mobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        {mobileOpen ? <X className="w-6 h-6 text-gray-600" /> : <Menu className="w-6 h-6 text-gray-600" />}
       </button>
 
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/20 z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div className={`
-        fixed left-0 top-0 h-full bg-white shadow-lg border-r border-gray-200 z-40
+        fixed left-0 top-0 h-full bg-white border-r border-gray-100 z-40
         transition-all duration-300 ease-in-out flex flex-col
-        ${collapsed ? 'w-16' : 'w-80'}
+        ${collapsed ? 'w-16' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Header Section */}
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          {!collapsed && (
-            <div className="flex items-center space-x-3 mb-4">
+        <div className="flex-shrink-0 px-6 py-8 border-b border-gray-50">
+          {!collapsed ? (
+            <>
+              {/* Logo */}
+              <div className="flex items-center justify-center mb-8">
+                <img
+                  src="/finning-cat-logo.png"
+                  alt="Finning CAT Logo"
+                  className="h-20 w-auto"
+                  style={{ maxWidth: 250 }}
+                />
+              </div>
+              
+              {/* Title */}
+              <div className="text-center">
+                <h1 className="text-lg font-semibold text-gray-900 mb-1">
+                  TCRS Approval
+                </h1>
+                <p className="text-sm text-gray-500">System</p>
+              </div>
+            </>
+          ) : (
+            <div className="flex justify-center">
               <img
                 src="/finning-cat-logo.png"
                 alt="Finning CAT Logo"
-                className="h-10 w-auto transition-transform hover:scale-105"
-                style={{ maxWidth: 200 }}
+                className="h-6 w-6 object-contain"
               />
             </div>
           )}
-          
-          {!collapsed && (
-            <div className="mb-4">
-              <h1 className="text-lg font-bold text-gray-900">TCRS Approval</h1>
-              <p className="text-sm text-gray-600">System</p>
-            </div>
-          )}
-
-          {/* Collapse Button - Desktop only */}
-          <button
-            onClick={onToggleCollapse}
-            className="hidden lg:flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors ml-auto"
-          >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <ChevronLeft className="w-4 h-4" />
-            )}
-          </button>
         </div>
 
-        {/* Navigation Section - Flex grow para ocupar espacio disponible */}
-        <div className="flex-1 p-4">
-          <nav className="space-y-3">
+        {/* Navigation Section */}
+        <div className="flex-1 px-4 py-6">
+          <nav className="space-y-2">
             {navigationItems
               .filter(item => item.available)
               .map((item) => {
                 const Icon = item.icon;
-                const isActive = activeView === item.id;
+                const isActive = pathname === item.href;
                 
                 return (
-                  <button
+                  <Link
                     key={item.id}
-                    onClick={() => handleViewChange(item.id)}
+                    href={item.href}
+                    onClick={handleNavClick}
                     className={`
-                      w-full flex items-center gap-3 p-3 rounded-xl font-medium
-                      transition-all duration-200 transform hover:-translate-y-0.5
+                      flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200
                       ${collapsed ? 'justify-center' : 'justify-start'}
                       ${
                         isActive
-                          ? `bg-gradient-to-r ${item.color} text-white shadow-lg`
-                          : `bg-gray-100 hover:bg-gray-200 text-gray-700 hover:shadow-md ${item.hoverColor.replace('hover:from-', 'hover:bg-').replace('hover:to-', '').split(' ')[0]}`
+                          ? 'bg-yellow-400 text-black font-medium shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                       }
                     `}
                   >
-                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    <Icon className={`
+                      w-5 h-5 flex-shrink-0
+                      ${isActive ? 'text-black' : 'text-gray-500'}
+                    `} />
                     {!collapsed && (
-                      <span className="font-semibold">{item.label}</span>
+                      <span className="font-medium">
+                        {item.label}
+                      </span>
                     )}
-                  </button>
+                  </Link>
                 );
               })}
           </nav>
         </div>
 
-        {/* User Info Section - Ahora en la parte inferior */}
-        <div className="p-4 border-t border-gray-200 flex-shrink-0">
-          {!collapsed && (
-            <div className="mb-4">
-              <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+        {/* Collapse Button */}
+        <div className="flex-shrink-0 px-4 py-4 border-t border-gray-50">
+          <button
+            onClick={onToggleCollapse}
+            className="hidden lg:flex items-center justify-center w-full h-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            {collapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <div className="flex items-center gap-2">
+                <ChevronLeft className="w-4 h-4" />
+                <span className="text-sm font-medium">Collapse</span>
+              </div>
+            )}
+          </button>
+        </div>
+
+        {/* User Section */}
+        <div className="flex-shrink-0 p-4 border-t border-gray-100">
+          {!collapsed ? (
+            <div className="space-y-4">
+              {/* User Info */}
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold">
                   {user.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                  <p className="text-sm font-medium text-gray-900 truncate">
                     {user.name}
                   </p>
                   <p className="text-xs text-gray-500 truncate">
                     {user.email}
                   </p>
-                  <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-md">
-                    {userRole}
-                  </span>
                 </div>
               </div>
-            </div>
-          )}
 
-          {collapsed && (
-            <div className="flex justify-center mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+              {/* Role Badge */}
+              <div className="flex justify-center">
+                <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full border border-yellow-200">
+                  {userRole}
+                </span>
+              </div>
+
+              {/* Sign Out Button */}
+              <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group">
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm font-medium">Sign Out</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center space-y-3">
+              {/* Collapsed User Avatar */}
+              <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold text-xs">
                 {user.name?.charAt(0)?.toUpperCase() || 'U'}
               </div>
+              
+              {/* Collapsed Sign Out */}
+              <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                <LogOut className="w-4 h-4" />
+              </button>
             </div>
           )}
-
-          {/* Sign Out Button */}
-          <div className="flex justify-center">
-            <EnhancedSignOutButton 
-              variant={collapsed ? 'icon' : 'sidebar'}
-              collapsed={collapsed}
-            />
-          </div>
         </div>
       </div>
     </>

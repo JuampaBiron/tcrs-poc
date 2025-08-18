@@ -1,3 +1,4 @@
+// src/middleware.ts - VERSIÓN COMPLETA ACTUALIZADA
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
@@ -8,7 +9,12 @@ export default auth((req) => {
   console.log(`🛡️ Middleware: ${pathname} - Auth: ${isAuthenticated}`)
 
   // Protected routes - require authentication
-  const protectedRoutes = ['/dashboard']
+  const protectedRoutes = [
+    '/dashboard',
+    '/request', 
+    '/admin'
+  ]
+  
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   
   if (isProtectedRoute && !isAuthenticated) {
