@@ -1,10 +1,9 @@
-// src/components/dashboard/requests-table.tsx
 "use client";
 
-import { Eye } from "lucide-react";
+import { Eye, ArrowUp, ArrowDown } from "lucide-react";
 import { FilterState, UserRole, Request, RequestStatus } from "@/types";
 import { REQUEST_STATUS } from "@/constants";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 interface RequestsTableProps {
   userRole: UserRole;
@@ -14,6 +13,12 @@ interface RequestsTableProps {
   onRefresh: () => void;
 }
 
+// Define el tipo para la configuración de ordenación
+interface SortConfig {
+  key: keyof Request | null;
+  direction: 'asc' | 'desc';
+}
+
 export default function RequestsTable({
   userRole,
   requests,
@@ -21,15 +26,58 @@ export default function RequestsTable({
   filters,
   onRefresh
 }: RequestsTableProps) {
-  // Usar requests reales del prop en lugar de datos de ejemplo
-  const filteredRequests = useMemo(() => {
-    return requests.filter(request => {
+  // Estado para la configuración de ordenación
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'asc' });
+
+  // Función para manejar el clic en los encabezados de la tabla
+  const handleSort = (key: keyof Request) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    // Si la columna actual es la misma, cambia la dirección
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    // Actualiza el estado con la nueva configuración de ordenación
+    setSortConfig({ key, direction });
+  };
+
+  // Usar useMemo para filtrar y ordenar los datos
+  const sortedAndFilteredRequests = useMemo(() => {
+    // 1. Filtrar los datos primero
+    const filtered = requests.filter(request => {
       const matchesSearch = request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           request.requester?.toLowerCase().includes(searchQuery.toLowerCase());
+                          request.requester?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = !filters.status || request.status === filters.status;
       return matchesSearch && matchesStatus;
     });
-  }, [searchQuery, filters, requests]);
+
+    // 2. Ordenar los datos filtrados
+    if (sortConfig.key !== null) {
+      filtered.sort((a, b) => {
+        const aValue = a[sortConfig.key!];
+        const bValue = b[sortConfig.key!];
+
+        if (aValue === undefined || aValue === null) return 1;
+        if (bValue === undefined || bValue === null) return -1;
+        
+        let comparison = 0;
+        // Lógica de comparación basada en el tipo de dato
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          comparison = aValue.localeCompare(bValue);
+        } else if (typeof aValue === 'number' && typeof bValue === 'number') {
+          comparison = aValue - bValue;
+        } else {
+          // Fallback para otros tipos, como fechas
+          const dateA = new Date(aValue as any);
+          const dateB = new Date(bValue as any);
+          comparison = dateA.getTime() - dateB.getTime();
+        }
+
+        return sortConfig.direction === 'asc' ? comparison : -comparison;
+      });
+    }
+
+    return filtered;
+  }, [searchQuery, filters, requests, sortConfig]);
 
   const getStatusColor = (status: RequestStatus) => {
     switch (status) {
@@ -51,6 +99,12 @@ export default function RequestsTable({
     }
   };
 
+  // Función auxiliar para mostrar el icono de ordenación
+  const getSortIcon = (key: keyof Request) => {
+    if (sortConfig.key !== key) return null;
+    return sortConfig.direction === 'asc' ? <ArrowUp size={14} className="ml-1" /> : <ArrowDown size={14} className="ml-1" />;
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -62,17 +116,29 @@ export default function RequestsTable({
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Request Title
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('title')}>
+                <div className="flex items-center">
+                  Request Title
+                  {getSortIcon('title')}
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('status')}>
+                <div className="flex items-center">
+                  Status
+                  {getSortIcon('status')}
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Requester
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('requester')}>
+                <div className="flex items-center">
+                  Requester
+                  {getSortIcon('requester')}
+                </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Submitted On
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('submittedOn')}>
+                <div className="flex items-center">
+                  Submitted On
+                  {getSortIcon('submittedOn')}
+                </div>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -80,7 +146,7 @@ export default function RequestsTable({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredRequests.map((request) => (
+            {sortedAndFilteredRequests.map((request) => (
               <tr key={request.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4">
                   <div className="text-sm font-medium text-gray-900">{request.title}</div>
@@ -104,7 +170,7 @@ export default function RequestsTable({
         </table>
       </div>
 
-      {filteredRequests.length === 0 && (
+      {sortedAndFilteredRequests.length === 0 && (
         <div className="text-center py-8">
           <p className="text-gray-500">No requests found matching your criteria.</p>
         </div>

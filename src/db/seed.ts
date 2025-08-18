@@ -1,10 +1,10 @@
 // Load environment variables first
-import { config } from 'dotenv'
-config({ path: '.env.local' })
+import { config } from 'dotenv';
+config({ path: '.env.local' });
 
 import { db, workflowSteps, approvalRequests, NewWorkflowStep, NewApprovalRequest } from "./index"
 import { REQUEST_STATUS } from "@/constants"
-
+//console.log("DATABASE_URL:", process.env.DATABASE_URL);
 // Datos iniciales para WorkflowSteps basados en dbdiagram.txt
 const initialWorkflowSteps: NewWorkflowStep[] = [
   {

@@ -3,10 +3,10 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import DashboardSidebar from "@/components/dashboard/dashboard-sidebar";
+import DashboardSidebar from "@/components/navigation/navigation-sidebar";
 import { isValidUserRole, USER_ROLES } from "@/constants";
 import { redirect } from "next/navigation";
-import SignOutButton from "@/components/ui/sign-out-button";
+import SignOutButton from "@/components/navigation/sign-out-button";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 
 // Type derivation from constants

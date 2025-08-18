@@ -132,5 +132,5 @@ export async function downloadFile(blob: Blob, filename: string) {
 
 export function generateExportFilename(type: string = 'requests'): string {
   const date = new Date().toISOString().split('T')[0]
-  return `tcrs-${type}-${date}.csv`
+  return `tcrs-${type}-${date}.xlsx`  // ✅ Ahora usa .xlsx
 }

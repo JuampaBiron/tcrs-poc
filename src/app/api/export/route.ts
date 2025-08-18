@@ -1,24 +1,49 @@
-// Reemplazar src/app/api/export/route.ts con esta versión corregida:
+// Archivo: src/app/api/export/route.ts
 
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from "@/auth"
+import { getUserRole } from "@/lib/auth-utils"
 import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
-import { USER_ROLES, REQUEST_STATUS } from '@/constants'
+import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
+import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
+import ExcelJS from 'exceljs' // ✅ Import ExcelJS
 
 export async function POST(request: NextRequest) {
   try {
+    // 1. Verificar autenticación
+    const session = await auth()
+    if (!session?.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
+    // 2. Validar usuario y roles
+    let userRole;
+    try {
+      userRole = getUserRole(session.user);
+    } catch (error) {
+      return NextResponse.json({ 
+        error: 'User not authorized - not in any TCRS group' 
+      }, { status: 403 })
+    }
+
+    // 3. Obtener parámetros del body
     const body = await request.json()
     const { role, email, filters } = body
 
     if (!role || !email) {
-      return NextResponse.json({ error: 'Missing role or email' }, { status: 400 })
+      return NextResponse.json({ 
+        error: 'Missing required parameters: role and email' 
+      }, { status: 400 })
     }
 
-    console.log(`📋 Exporting data for ${role}: ${email}`)
-    console.log(`🔍 Applied filters:`, filters)
+    if (!isValidUserRole(role) || role !== userRole || email !== session.user.email) {
+      return NextResponse.json({ 
+        error: 'Invalid role or authorization' 
+      }, { status: 403 })
+    }
 
-    // 1. Obtener todos los requests según el rol
+    // 4. Obtener datos según el rol
     let requests
-    
     switch (role) {
       case USER_ROLES.REQUESTER:
         requests = await getRequestsByUser(email)
@@ -30,150 +55,159 @@ export async function POST(request: NextRequest) {
         requests = await getAllRequests()
         break
       default:
-        return NextResponse.json({ error: 'Invalid role' }, { status: 400 })
+        throw new ValidationError('Invalid role')
     }
 
-    // 2. ✅ APLICAR FILTROS A LOS DATOS (esto faltaba!)
-    let filteredRequests = requests
-
-    // Filtrar por searchQuery si existe
-    if (filters?.searchQuery) {
-      const searchTerm = filters.searchQuery.toLowerCase()
-      filteredRequests = filteredRequests.filter(req => {
-        const title = (req.comments || '').toLowerCase()
-        const requester = (req.requester || '').toLowerCase()
-        return title.includes(searchTerm) || requester.includes(searchTerm)
-      })
-    }
-
-    // Filtrar por status si existe
-    if (filters?.status) {
-      filteredRequests = filteredRequests.filter(req => 
-        (req.approverStatus || REQUEST_STATUS.PENDING) === filters.status
-      )
-    }
-
-    // Filtrar por branch si existe
-    if (filters?.branch) {
-      filteredRequests = filteredRequests.filter(req => {
-        const comments = req.comments || ''
-        // Extraer branch del campo comments (como está implementado actualmente)
-        const branchMatch = comments.match(/(TCRS - Branch \d+|Sitech|Fused-[A-Za-z]+)/i)
-        const branch = branchMatch ? branchMatch[1] : 'Unknown Branch'
-        
-        // Mapear filtros del frontend a valores reales
-        const branchMappings: { [key: string]: string } = {
-          'branch1': 'TCRS - Branch 1',
-          'branch2': 'TCRS - Branch 2', 
-          'sitech': 'Sitech',
-          'fused-canada': 'Fused-Canada'
-        }
-        
-        const expectedBranch = branchMappings[filters.branch.toLowerCase()] || filters.branch
-        return branch.toLowerCase().includes(expectedBranch.toLowerCase())
-      })
-    }
-
-    // Filtrar por dateRange si existe
-    if (filters?.dateRange && filteredRequests.length > 0) {
-      const now = new Date()
-      let cutoffDate: Date
+    // 5. Aplicar filtros
+    const filteredRequests = requests.filter(req => {
+      const matchesSearch = filters?.searchQuery ? 
+        (req.comments?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+         req.requester?.toLowerCase().includes(filters.searchQuery.toLowerCase())) : true
       
-      switch (filters.dateRange) {
-        case 'last7days':
-          cutoffDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-          break
-        case 'last30days':
-          cutoffDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
-          break
-        case 'last90days':
-          cutoffDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
-          break
-        default:
-          cutoffDate = new Date(0) // No filtrar
-      }
+      const matchesStatus = filters?.status ? req.approverStatus === filters.status : true
+      const matchesBranch = filters?.branch ? 
+        extractBranch(req.comments || '').includes(filters.branch) : true
       
-      filteredRequests = filteredRequests.filter(req => {
-        const createdDate = req.createdDate ? new Date(req.createdDate) : new Date(0)
-        return createdDate >= cutoffDate
-      })
-    }
+      return matchesSearch && matchesStatus && matchesBranch
+    })
 
-    // Filtrar por amount si existe (necesita extraer el monto del comments)
-    if (filters?.amount) {
-      filteredRequests = filteredRequests.filter(req => {
-        const comments = req.comments || ''
-        // Extraer monto del campo comments
-        const amountMatch = comments.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i)
-        const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : 0
-        
-        switch (filters.amount) {
-          case 'under1000':
-            return amount < 1000
-          case '1000to5000':
-            return amount >= 1000 && amount <= 5000
-          case 'over5000':
-            return amount > 5000
-          default:
-            return true
-        }
-      })
-    }
-
-    console.log(`📊 Original records: ${requests.length}, Filtered records: ${filteredRequests.length}`)
-
-    // 3. Transform data for export
-    const exportData = filteredRequests.map(req => ({
-      'Request ID': req.requestId,
-      'Description': req.comments || 'No description', 
-      'Status': req.approverStatus || REQUEST_STATUS.PENDING,
-      'Requester': req.requester || 'Unknown',
-      'Assigned Approver': req.assignedApprover || 'Unassigned',
-      'Created Date': req.createdDate ? new Date(req.createdDate).toLocaleDateString() : 'Unknown',
-      'Modified Date': req.modifiedDate ? new Date(req.modifiedDate).toLocaleDateString() : 'N/A'
-    }))
-
-    // 4. Create CSV content
-    if (exportData.length === 0) {
+    if (filteredRequests.length === 0) {
       return NextResponse.json({ 
         error: 'No data to export with current filters',
         message: 'Try adjusting your filters or search criteria'
       }, { status: 400 })
     }
 
-    const headers = Object.keys(exportData[0])
-    const csvContent = [
-      headers.join(','),
-      ...exportData.map(row => 
-        headers.map(header => {
-          const value = row[header as keyof typeof row] || ''
-          const stringValue = String(value)
-          const needsQuotes = stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')
-          if (needsQuotes) {
-            return `"${stringValue.replace(/"/g, '""')}"`
-          }
-          return stringValue
-        }).join(',')
-      )
-    ].join('\n')
+    // 6. ✅ CREAR EXCEL SIMPLE
+    const excelBuffer = await createSimpleExcel(filteredRequests)
 
-    console.log(`✅ Exporting ${exportData.length} filtered records`)
+    console.log(`✅ Exporting ${filteredRequests.length} records to simple Excel`)
 
-    // 5. Return filtered CSV
-    const filename = `tcrs-requests-${filters?.searchQuery ? 'filtered-' : ''}${new Date().toISOString().split('T')[0]}.csv`
+    // 7. ✅ RETORNAR ARCHIVO EXCEL
+    const filename = `tcrs-requests-${filters?.searchQuery ? 'filtered-' : ''}${new Date().toISOString().split('T')[0]}.xlsx`
     
-    return new NextResponse(csvContent, {
+    // ✅ FIX: Use Uint8Array.from() to create a web-compatible ArrayBuffer from the Node.js Buffer
+    return new NextResponse(Uint8Array.from(excelBuffer), { 
       headers: {
-        'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="${filename}"`
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Length': excelBuffer.length.toString(),
+        'Cache-Control': 'no-cache',
       }
     })
 
   } catch (error) {
-    console.error('❌ Error exporting data:', error)
+    console.error('❌ Error exporting Excel data:', error)
     return NextResponse.json({ 
-      error: 'Export failed', 
+      error: 'Excel export failed', 
       details: error instanceof Error ? error.message : 'Unknown error' 
     }, { status: 500 })
   }
+}
+
+// ===== FUNCIÓN SIMPLE DE CREACIÓN DE EXCEL =====
+
+async function createSimpleExcel(requests: any[]): Promise<Buffer> {
+  
+  // ✅ Crear workbook básico
+  const workbook = new ExcelJS.Workbook()
+  
+  // ✅ Crear una sola hoja llamada "Base"
+  const worksheet = workbook.addWorksheet('Base')
+
+  // ✅ Preparar datos simples
+  const exportData = requests.map(req => ({
+    'Request ID': req.requestId,
+    'Description': req.comments || 'No description',
+    'Status': req.approverStatus || REQUEST_STATUS.PENDING,
+    'Requester': req.requester || 'Unknown',
+    'Assigned Approver': req.assignedApprover || 'Unassigned',
+    'Created Date': req.createdDate ? formatSimpleDate(req.createdDate) : '',
+    'Modified Date': req.modifiedDate ? formatSimpleDate(req.modifiedDate) : '',
+    'Branch': extractBranch(req.comments || ''),
+    'Amount': extractAmount(req.comments || ''),
+    'Currency': extractCurrency(req.comments || 'CAD')
+  }))
+
+  // ✅ Obtener headers
+  const headers = Object.keys(exportData[0])
+  
+  // ✅ Agregar headers con fondo verde (primera fila)
+  const headerRow = worksheet.getRow(1)
+  headers.forEach((header, index) => {
+    const cell = headerRow.getCell(index + 1)
+    cell.value = header
+    
+    // ✅ Solo color verde de fondo para headers
+    cell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF70AD47' } // Verde
+    }
+    
+    // ✅ Texto blanco y bold para que se vea bien
+    cell.font = { 
+      bold: true, 
+      color: { argb: 'FFFFFFFF' } 
+    }
+  })
+  
+  // ✅ Agregar datos (sin formato especial)
+  exportData.forEach((row, rowIndex) => {
+    const excelRow = worksheet.getRow(rowIndex + 2) // Empezar en fila 2
+    const values = Object.values(row)
+    
+    values.forEach((value, colIndex) => {
+      const cell = excelRow.getCell(colIndex + 1)
+      cell.value = value
+      // ✅ Sin formato especial, solo el valor
+    })
+  })
+
+  // ✅ Ajustar ancho de columnas automáticamente
+  headers.forEach((header, index) => {
+    const column = worksheet.getColumn(index + 1)
+    let maxLength = header.length
+    
+    // Calcular ancho basado en contenido
+    exportData.forEach(row => {
+      const value = Object.values(row)[index]
+      const valueLength = String(value).length
+      if (valueLength > maxLength) {
+        maxLength = valueLength
+      }
+    })
+    
+    // Establecer ancho (mínimo 10, máximo 50)
+    column.width = Math.max(10, Math.min(50, maxLength + 2))
+  })
+
+  // ✅ Generar buffer
+  const buffer = await workbook.xlsx.writeBuffer()
+  return Buffer.from(buffer)
+}
+
+// ===== FUNCIONES AUXILIARES SIMPLES =====
+
+function formatSimpleDate(date: Date | string): string {
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return ''
+  
+  // ✅ Formato simple DD/MM/YYYY
+  return d.toLocaleDateString('es-CL')
+}
+
+function extractBranch(comments: string): string {
+  const branchMatch = comments.match(/(TCRS - Branch \d+|Sitech|Fused-[A-Za-z]+)/i)
+  return branchMatch ? branchMatch[1] : 'Unknown'
+}
+
+function extractAmount(comments: string): string {
+  const amountMatch = comments.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i)
+  return amountMatch ? amountMatch[1] : 'N/A'
+}
+
+function extractCurrency(comments: string): string {
+  const currencyMatch = comments.match(/\$[0-9,]+(?:\.[0-9]{2})?\s+([A-Z]{3})/i)
+  return currencyMatch ? currencyMatch[1] : 'CAD'
 }

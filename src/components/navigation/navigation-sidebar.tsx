@@ -16,7 +16,7 @@ import {
   X,
   LogOut
 } from "lucide-react";
-import EnhancedSignOutButton from "../ui/sign-out-button";
+import SignOutButton from "./sign-out-button"; // ✅ Usar el componente correcto
 
 // Type derivation from constants
 type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
@@ -209,11 +209,11 @@ export default function DashboardSidebar({
                 </span>
               </div>
 
-              {/* Sign Out Button */}
-              <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group">
-                <LogOut className="w-4 h-4" />
-                <span className="text-sm font-medium">Sign Out</span>
-              </button>
+              {/* ✅ FIXED: Sign Out Button con funcionalidad */}
+              <SignOutButton 
+                variant="sidebar" 
+                collapsed={false} 
+              />
             </div>
           ) : (
             <div className="flex flex-col items-center space-y-3">
@@ -222,10 +222,11 @@ export default function DashboardSidebar({
                 {user.name?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               
-              {/* Collapsed Sign Out */}
-              <button className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                <LogOut className="w-4 h-4" />
-              </button>
+              {/* ✅ FIXED: Collapsed Sign Out con funcionalidad */}
+              <SignOutButton 
+                variant="icon" 
+                collapsed={true} 
+              />
             </div>
           )}
         </div>
