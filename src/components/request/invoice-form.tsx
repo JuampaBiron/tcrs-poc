@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
+import { DICTIONARY_FALLBACKS, API_ROUTES } from "@/constants";
 
 interface InvoiceData {
   company: string;
@@ -22,10 +23,14 @@ interface InvoiceFormProps {
   initialData?: InvoiceData | null;
 }
 
-interface Dictionary {
-  companies: Array<{ code: string; description: string; }>;
-  branches: Array<{ code: string; description: string; }>;
-  currencies: Array<{ code: string; name: string; }>;
+interface DictionaryItem {
+  code: string;
+  description: string;
+}
+
+interface CurrencyItem {
+  code: string;
+  name: string;
 }
 
 export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps) {
@@ -40,121 +45,137 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     pdfFile: initialData?.pdfFile,
   });
 
-  const [dictionaries, setDictionaries] = useState<Dictionary>({
-    companies: [],
-    branches: [],
-    currencies: [
-      { code: 'CAD', name: 'Canadian Dollar' },
-      { code: 'USD', name: 'US Dollar' },
-      { code: 'EUR', name: 'Euro' },
-    ]
-  });
+  // Separate states for dropdown data
+  const [companies, setCompanies] = useState<DictionaryItem[]>([...DICTIONARY_FALLBACKS.companies]);
+  const [branches, setBranches] = useState<DictionaryItem[]>([]);
+  const [currencies, setCurrencies] = useState<CurrencyItem[]>([...DICTIONARY_FALLBACKS.currencies]);
 
+  // Loading states
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [loadingBranches, setLoadingBranches] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Error states
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Load dictionaries on mount
+  // Load companies on mount
   useEffect(() => {
-    loadDictionaries();
+    loadCompanies();
   }, []);
 
-  const loadDictionaries = async () => {
+  // Load branches when company changes
+  useEffect(() => {
+    if (formData.company) {
+      loadBranches(formData.company);
+    } else {
+      setBranches([]);
+    }
+  }, [formData.company]);
+
+  const loadCompanies = async () => {
     try {
-      const response = await fetch('/api/dictionaries');
+      setLoadingCompanies(true);
+      console.log('🏢 Loading companies...');
+      
+      const response = await fetch(`${API_ROUTES.DICTIONARIES}/companies`);
       if (!response.ok) {
-        throw new Error('Failed to load dictionaries');
+        throw new Error('Failed to load companies');
       }
+      
       const data = await response.json();
-      setDictionaries(prev => ({
-        ...prev,
-        companies: data.companies || [],
-        branches: data.branches || [],
-      }));
+      if (data.success && data.data?.companies) {
+        setCompanies(data.data.companies);
+        console.log(`✅ Loaded ${data.data.companies.length} companies from DB`);
+      } else {
+        throw new Error('Invalid response format');
+      }
     } catch (err) {
-      console.error('Error loading dictionaries:', err);
-      // Use fallback data for development
-      setDictionaries(prev => ({
-        ...prev,
-        companies: [
-          { code: 'TCRS', description: 'TCRS Company' },
-          { code: 'FINN', description: 'Finning Canada' },
-          { code: 'SITECH', description: 'Sitech' },
-        ],
-        branches: [
-          { code: 'BR001', description: 'Branch 1 - Toronto' },
-          { code: 'BR002', description: 'Branch 2 - Vancouver' },
-          { code: 'BR003', description: 'Branch 3 - Calgary' },
-        ]
-      }));
+      console.error('❌ Error loading companies:', err);
+      console.log('📋 Using fallback companies');
+      // Keep using fallback data already set in useState
+    } finally {
+      setLoadingCompanies(false);
+    }
+  };
+
+  const loadBranches = async (companyErp: string) => {
+    try {
+      setLoadingBranches(true);
+      console.log(`🏗️ Loading branches for company: ${companyErp}`);
+      
+      const response = await fetch(`${API_ROUTES.DICTIONARIES}/branches?erp=${encodeURIComponent(companyErp)}`);
+      if (!response.ok) {
+        throw new Error('Failed to load branches');
+      }
+      
+      const data = await response.json();
+      if (data.success && data.data?.branches) {
+        setBranches(data.data.branches);
+        console.log(`✅ Loaded ${data.data.branches.length} branches for ${companyErp}`);
+      } else {
+        throw new Error('Invalid response format');
+      }
+    } catch (err) {
+      console.error('❌ Error loading branches:', err);
+      console.log('📋 Using empty branches list');
+      setBranches([]);
+    } finally {
+      setLoadingBranches(false);
     }
   };
 
   const handleInputChange = (field: keyof InvoiceData, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-    setError(null);
+    setFormData(prev => {
+      const newData = { ...prev, [field]: value };
+      
+      // If company changes, reset branch
+      if (field === 'company' && value !== prev.company) {
+        newData.branch = '';
+      }
+      
+      return newData;
+    });
+    
+    // Clear error when user starts typing
+    if (error) {
+      setError(null);
+    }
   };
 
   const handleFileUpload = (file: File) => {
-    if (file.type !== 'application/pdf') {
-      setError('Please upload a PDF file only');
-      return;
+    if (file.type === 'application/pdf') {
+      handleInputChange('pdfFile', file);
+    } else {
+      setError('Please upload a PDF file');
     }
-    
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
-      setError('File size must be less than 10MB');
-      return;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      pdfFile: file
-    }));
-    setError(null);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileUpload(files[0]);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragActive(true);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragActive(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragActive(false);
-    
-    const files = e.dataTransfer.files;
-    if (files && files[0]) {
-      handleFileUpload(files[0]);
-    }
-  };
-
-  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files[0]) {
-      handleFileUpload(files[0]);
-    }
-  };
-
-  const removeFile = () => {
-    setFormData(prev => ({
-      ...prev,
-      pdfFile: undefined
-    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    // Validation
+    // Basic validation
     if (!formData.company) {
       setError('Company is required');
       return;
@@ -182,44 +203,74 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
       {error && <ErrorMessage message={error} />}
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Company Selection */}
+        {/* Company and Branch Selection (Cascade) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Company Dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Company *
             </label>
-            <select
-              value={formData.company}
-              onChange={(e) => handleInputChange('company', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Select Company</option>
-              {dictionaries.companies.map((company) => (
-                <option key={company.code} value={company.code}>
-                  {company.description}
+            <div className="relative">
+              <select
+                value={formData.company}
+                onChange={(e) => handleInputChange('company', e.target.value)}
+                disabled={loadingCompanies}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                required
+              >
+                <option value="">
+                  {loadingCompanies ? "Loading companies..." : "Select Company"}
                 </option>
-              ))}
-            </select>
+                {companies.map((company) => (
+                  <option key={company.code} value={company.code}>
+                    {company.description}
+                  </option>
+                ))}
+              </select>
+              {loadingCompanies && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <LoadingSpinner size="sm" />
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Branch Dropdown (Dependent on Company) */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Branch *
             </label>
-            <select
-              value={formData.branch}
-              onChange={(e) => handleInputChange('branch', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            >
-              <option value="">Select Branch</option>
-              {dictionaries.branches.map((branch) => (
-                <option key={branch.code} value={branch.code}>
-                  {branch.description}
+            <div className="relative">
+              <select
+                value={formData.branch}
+                onChange={(e) => handleInputChange('branch', e.target.value)}
+                disabled={!formData.company || loadingBranches}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                required
+              >
+                <option value="">
+                  {!formData.company 
+                    ? "Select Company first" 
+                    : loadingBranches 
+                    ? "Loading branches..." 
+                    : "Select Branch"
+                  }
                 </option>
-              ))}
-            </select>
+                {branches.map((branch) => (
+                  <option key={branch.code} value={branch.code}>
+                    {branch.description}
+                  </option>
+                ))}
+              </select>
+              {loadingBranches && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <LoadingSpinner size="sm" />
+                </div>
+              )}
+            </div>
+            {!formData.company && (
+              <p className="text-xs text-gray-500 mt-1">Please select a company first</p>
+            )}
           </div>
         </div>
 
@@ -246,7 +297,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
               type="text"
               value={formData.vendor}
               onChange={(e) => handleInputChange('vendor', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter vendor name"
               required
             />
@@ -260,7 +311,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
               type="text"
               value={formData.po}
               onChange={(e) => handleInputChange('po', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Enter PO number"
             />
           </div>
@@ -270,7 +321,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Total Amount (including Tax) *
+              Invoice Amount *
             </label>
             <input
               type="number"
@@ -278,7 +329,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
               min="0"
               value={formData.amount}
               onChange={(e) => handleInputChange('amount', parseFloat(e.target.value) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="0.00"
               required
             />
@@ -291,11 +342,11 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
             <select
               value={formData.currency}
               onChange={(e) => handleInputChange('currency', e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             >
-              {dictionaries.currencies.map((currency) => (
+              {currencies.map((currency) => (
                 <option key={currency.code} value={currency.code}>
-                  {currency.code} - {currency.name}
+                  {currency.name} ({currency.code})
                 </option>
               ))}
             </select>
@@ -307,61 +358,57 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Invoice PDF
           </label>
-          
-          {!formData.pdfFile ? (
-            <div
-              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
-                dragActive 
-                  ? 'border-blue-400 bg-blue-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-            >
-              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600 mb-2">
-                Drag and drop your PDF file here, or
-              </p>
-              <label className="inline-block px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-md hover:bg-blue-100 cursor-pointer">
-                Browse Files
-                <input
-                  type="file"
-                  accept=".pdf"
-                  onChange={handleFileInputChange}
-                  className="hidden"
-                />
-              </label>
-              <p className="text-xs text-gray-500 mt-2">PDF files up to 10MB</p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
-              <div className="flex items-center">
-                <FileText className="w-5 h-5 text-gray-500 mr-2" />
-                <span className="text-sm text-gray-900">{formData.pdfFile.name}</span>
-                <span className="text-xs text-gray-500 ml-2">
-                  ({Math.round(formData.pdfFile.size / 1024)} KB)
-                </span>
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center ${
+              dragActive ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
+            }`}
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+          >
+            {formData.pdfFile ? (
+              <div className="flex items-center justify-center space-x-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                <span className="text-sm text-gray-700">{formData.pdfFile.name}</span>
+                <button
+                  type="button"
+                  onClick={() => handleInputChange('pdfFile', undefined)}
+                  className="text-red-500 hover:text-red-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={removeFile}
-                className="p-1 text-gray-400 hover:text-red-500"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
+            ) : (
+              <div>
+                <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">
+                  Drag and drop your PDF here, or{' '}
+                  <label className="text-blue-600 hover:text-blue-500 cursor-pointer">
+                    browse
+                    <input
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-end pt-4">
+        <div className="flex justify-end">
           <button
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled={loading || loadingCompanies || loadingBranches}
+            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? <LoadingSpinner /> : 'Continue to GL Coding'}
+            {loading ? <LoadingSpinner size="sm" /> : 'Continue'}
           </button>
         </div>
       </form>

@@ -2,6 +2,90 @@ import { eq, desc, and, count, sql } from "drizzle-orm"
 import { db, approvalRequests, workflowHistory, workflowSteps } from "./index"
 import { USER_ROLES, REQUEST_STATUS } from "@/constants"
 import { UserRole } from "@/types"
+import { approverList } from './schema'
+
+// ===== DICTIONARY QUERIES =====
+
+/**
+ * Get all unique companies (ERPs) from approver_list
+ */
+export async function getAvailableCompanies() {
+  try {
+    const companies = await db
+      .selectDistinct({
+        code: approverList.erp,
+        description: approverList.erp, // Using same value for both for now
+      })
+      .from(approverList)
+      .where(sql`${approverList.erp} IS NOT NULL AND ${approverList.erp} != ''`)
+      .orderBy(approverList.erp)
+
+    return companies.map(company => ({
+      code: company.code || '',
+      description: company.description || ''
+    }))
+  } catch (error) {
+    console.error('Error fetching companies from approver_list:', error)
+    throw new Error('Failed to fetch companies')
+  }
+}
+
+/**
+ * Get all unique branches for a specific company (ERP) from approver_list
+ */
+export async function getAvailableBranches(companyErp: string) {
+  try {
+    if (!companyErp) {
+      throw new Error('Company ERP is required')
+    }
+
+    const branches = await db
+      .selectDistinct({
+        code: approverList.branch,
+        description: approverList.branch, // Using same value for both for now
+      })
+      .from(approverList)
+      .where(sql`${approverList.erp} = ${companyErp} AND ${approverList.branch} IS NOT NULL AND ${approverList.branch} != ''`)
+      .orderBy(approverList.branch)
+
+    return branches.map(branch => ({
+      code: branch.code || '',
+      description: branch.description || ''
+    }))
+  } catch (error) {
+    console.error(`Error fetching branches for company ${companyErp}:`, error)
+    throw new Error('Failed to fetch branches')
+  }
+}
+
+/**
+ * Get all available currencies (static data for now)
+ */
+export async function getAvailableCurrencies() {
+  // Static currencies - could be moved to database later if needed
+  return [
+    { code: 'CAD', name: 'Canadian Dollar' },
+    { code: 'USD', name: 'US Dollar' },
+    { code: 'EUR', name: 'Euro' },
+  ]
+}
+
+/**
+ * Validate if a company-branch combination exists in approver_list
+ */
+export async function validateCompanyBranchCombination(companyErp: string, branch: string) {
+  try {
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(approverList)
+      .where(sql`${approverList.erp} = ${companyErp} AND ${approverList.branch} = ${branch}`)
+
+    return Number(result[0]?.count) > 0
+  } catch (error) {
+    console.error('Error validating company-branch combination:', error)
+    return false
+  }
+}
 
 // ===== DASHBOARD QUERIES =====
 

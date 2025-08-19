@@ -2,8 +2,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { getUserRole } from "@/lib/auth-utils";
-import { USER_ROLES } from "@/constants";
+import { USER_ROLES, isValidUserRole } from "@/constants";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import RequestsView from "@/components/request/requests-view";
@@ -22,14 +21,16 @@ export default function RequestPage() {
     return <ErrorMessage message="Authentication required" />;
   }
 
-  let userRole: UserRole;
-  try {
-    userRole = getUserRole(session.user);
-  } catch (error) {
-    return <ErrorMessage message="User not authorized - not in any TCRS group" />;
-  }
-
+  // ✅ CORRECCIÓN: Usar el rol de la sesión, NO llamar getUserRole() en el cliente
+  const userRole = session?.user?.role as UserRole;
   const userEmail = session.user.email || "";
+
+  // Validar que el rol sea válido
+  if (!userRole || !isValidUserRole(userRole)) {
+    return (
+      <ErrorMessage message="User not authorized - invalid or missing role" />
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-6">
