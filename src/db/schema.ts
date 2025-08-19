@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, decimal, boolean, integer, serial, text, primaryKey, index } from 'drizzle-orm/pg-core'
+import { pgTable, varchar, timestamp, decimal, boolean, integer, serial, text, primaryKey, index, unique } from 'drizzle-orm/pg-core'
 import { relations } from 'drizzle-orm'
 import { createId } from '@paralleldrive/cuid2'
 import { REQUEST_STATUS } from '@/constants'
@@ -86,16 +86,22 @@ export const approvalRequests = pgTable('approval_requests', {
 })
 
 // Approver List Table
-export const approverList = pgTable('approver_list', {
-  approverId: varchar('approver_id', { length: 255 }).primaryKey().$defaultFn(() => createId()),
-  erp: varchar('erp', { length: 255 }),
-  branch: varchar('branch', { length: 255 }),
-  authorizedAmount: decimal('authorized_amount', { precision: 12, scale: 2 }),
-  authorizedApprover: varchar('authorized_approver', { length: 255 }).unique(),
-  emailAddress: varchar('email_address', { length: 255 }),
-  backUpApprover: varchar('back_up_approver', { length: 255 }),
-  backUpEmailAddress: varchar('back_up_email_address', { length: 255 }),
-})
+export const approverList = pgTable(
+  'approver_list',
+  {
+    approverId: varchar('approver_id', { length: 255 }).primaryKey().$defaultFn(() => createId()),
+    erp: varchar('erp', { length: 255 }),
+    branch: varchar('branch', { length: 255 }),
+    authorizedAmount: decimal('authorized_amount', { precision: 12, scale: 2 }),
+    authorizedApprover: varchar('authorized_approver', { length: 255 }),
+    emailAddress: varchar('email_address', { length: 255 }),
+    backUpApprover: varchar('back_up_approver', { length: 255 }),
+    backUpEmailAddress: varchar('back_up_email_address', { length: 255 }),
+  },
+  (table) => ({
+    uniqueAuthorizedApproverBranch: unique('unique_authorized_approver_branch').on(table.authorizedApprover, table.branch),
+  })
+)
 
 // TIFF File Generation Table
 export const tiffFileGeneration = pgTable('tiff_file_generation', {

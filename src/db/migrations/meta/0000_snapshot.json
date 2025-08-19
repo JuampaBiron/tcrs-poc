@@ -1,5 +1,5 @@
 {
-  "id": "19870b27-61da-4b47-bc3e-7b4c775c0554",
+  "id": "575d289c-9884-4c14-b96d-ca5c6bcee457",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -254,11 +254,12 @@
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "approver_list_authorized_approver_unique": {
-          "name": "approver_list_authorized_approver_unique",
+        "unique_authorized_approver_branch": {
+          "name": "unique_authorized_approver_branch",
           "nullsNotDistinct": false,
           "columns": [
-            "authorized_approver"
+            "authorized_approver",
+            "branch"
           ]
         }
       },

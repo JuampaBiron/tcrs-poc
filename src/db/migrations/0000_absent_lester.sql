@@ -41,7 +41,7 @@ CREATE TABLE "approver_list" (
 	"email_address" varchar(255),
 	"back_up_approver" varchar(255),
 	"back_up_email_address" varchar(255),
-	CONSTRAINT "approver_list_authorized_approver_unique" UNIQUE("authorized_approver")
+	CONSTRAINT "unique_authorized_approver_branch" UNIQUE("authorized_approver","branch")
 );
 --> statement-breakpoint
 CREATE TABLE "facility" (
