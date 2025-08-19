@@ -1,4 +1,19 @@
-CREATE TABLE "account_master" (
+CREATE TABLE "account" (
+	"userId" varchar(255) NOT NULL,
+	"type" varchar(255) NOT NULL,
+	"provider" varchar(255) NOT NULL,
+	"providerAccountId" varchar(255) NOT NULL,
+	"refresh_token" text,
+	"access_token" text,
+	"expires_at" integer,
+	"token_type" varchar(255),
+	"scope" varchar(255),
+	"id_token" text,
+	"session_state" varchar(255),
+	CONSTRAINT "account_provider_providerAccountId_pk" PRIMARY KEY("provider","providerAccountId")
+);
+--> statement-breakpoint
+CREATE TABLE "accounts" (
 	"account_code" varchar(255) PRIMARY KEY NOT NULL,
 	"account_description" varchar(255),
 	"account_combined" varchar(255),
@@ -38,8 +53,7 @@ CREATE TABLE "facility" (
 );
 --> statement-breakpoint
 CREATE TABLE "gl_coding_data" (
-	"file_id" varchar(255) NOT NULL,
-	"line" integer NOT NULL,
+	"upload_id" varchar(255) NOT NULL,
 	"account_code" varchar(255),
 	"facility_code" varchar(255),
 	"tax_code" varchar(255),
@@ -47,14 +61,14 @@ CREATE TABLE "gl_coding_data" (
 	"equipment" varchar(255),
 	"comments" text,
 	"created_date" timestamp DEFAULT now(),
-	"modified_date" timestamp,
-	CONSTRAINT "gl_coding_data_file_id_line_pk" PRIMARY KEY("file_id","line")
+	"modified_date" timestamp
 );
 --> statement-breakpoint
 CREATE TABLE "gl_coding_uploaded_data" (
-	"file_id" varchar(255) PRIMARY KEY NOT NULL,
+	"upload_id" varchar(255) PRIMARY KEY NOT NULL,
 	"request_id" varchar(255) NOT NULL,
 	"uploader" varchar(255),
+	"uploaded_file" boolean,
 	"status" varchar(50),
 	"blob_url" varchar(500),
 	"created_date" timestamp DEFAULT now(),
@@ -65,6 +79,7 @@ CREATE TABLE "invoice_data" (
 	"invoice_id" varchar(255) PRIMARY KEY NOT NULL,
 	"request_id" varchar(255) NOT NULL,
 	"company" varchar(255),
+	"tcrs_company" boolean,
 	"branch" varchar(255),
 	"vendor" varchar(255),
 	"po" varchar(255),
@@ -77,6 +92,12 @@ CREATE TABLE "invoice_data" (
 	CONSTRAINT "invoice_data_request_id_unique" UNIQUE("request_id")
 );
 --> statement-breakpoint
+CREATE TABLE "session" (
+	"sessionToken" varchar(255) PRIMARY KEY NOT NULL,
+	"userId" varchar(255) NOT NULL,
+	"expires" timestamp NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "tiff_file_generation" (
 	"gen_id" varchar(255) PRIMARY KEY NOT NULL,
 	"request_id" varchar(255) NOT NULL,
@@ -84,6 +105,21 @@ CREATE TABLE "tiff_file_generation" (
 	"file_name" varchar(255),
 	"blob_url" varchar(500),
 	"created_date" timestamp DEFAULT now()
+);
+--> statement-breakpoint
+CREATE TABLE "user" (
+	"id" varchar(255) PRIMARY KEY NOT NULL,
+	"name" varchar(255),
+	"email" varchar(255) NOT NULL,
+	"emailVerified" timestamp,
+	"image" varchar(255)
+);
+--> statement-breakpoint
+CREATE TABLE "verificationToken" (
+	"identifier" varchar(255) NOT NULL,
+	"token" varchar(255) NOT NULL,
+	"expires" timestamp NOT NULL,
+	CONSTRAINT "verificationToken_identifier_token_pk" PRIMARY KEY("identifier","token")
 );
 --> statement-breakpoint
 CREATE TABLE "workflow_history" (
@@ -106,7 +142,7 @@ CREATE TABLE "workflow_history" (
 --> statement-breakpoint
 CREATE TABLE "workflow_steps" (
 	"step_id" serial PRIMARY KEY NOT NULL,
-	"step_code" varchar(255) NOT NULL,
+	"step_code" varchar(100) NOT NULL,
 	"step_name" varchar(255) NOT NULL,
 	"step_description" text,
 	"step_category" varchar(100) NOT NULL,
