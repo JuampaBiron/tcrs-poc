@@ -198,7 +198,7 @@ export default function GLCodingTable({
                   <option value="">Select Tax</option>
                   {filteredTaxCodes.map((tax) => (
                     <option key={tax.code} value={tax.code}>
-                      {tax.code} - {tax.description}
+                      {tax.code}
                     </option>
                   ))}
                 </select>
