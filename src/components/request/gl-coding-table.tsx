@@ -67,17 +67,9 @@ export default function GLCodingTable({
   };
 
   // Filter dictionaries based on search
-  const filteredAccounts = dictionaries.accounts.filter(acc => 
-    acc.accountCombined.toLowerCase().includes(searchFilters.account.toLowerCase())
-  );
-  
-  const filteredFacilities = dictionaries.facilities.filter(fac => 
-    fac.facilityCombined.toLowerCase().includes(searchFilters.facility.toLowerCase())
-  );
-
-  const filteredTaxCodes = dictionaries.taxCodes.filter(tax => 
-    tax.description.toLowerCase().includes(searchFilters.taxCode.toLowerCase())
-  );
+  const filteredAccounts = dictionaries.accounts;
+  const filteredFacilities = dictionaries.facilities;
+  const filteredTaxCodes = dictionaries.taxCodes;
 
   // Export selected rows for parent component
   const getSelectedRows = () => Array.from(selectedRows);
@@ -105,43 +97,19 @@ export default function GLCodingTable({
             {/* Account with Search */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Account *
-              <div className="mt-1">
-                <input
-                  type="text"
-                  placeholder="Search account..."
-                  value={searchFilters.account}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, account: e.target.value }))}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              
             </th>
             
             {/* Facility with Search */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Facility *
-              <div className="mt-1">
-                <input
-                  type="text"
-                  placeholder="Search facility..."
-                  value={searchFilters.facility}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, facility: e.target.value }))}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              
             </th>
             
             {/* Tax Code with Search */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Tax Code
-              <div className="mt-1">
-                <input
-                  type="text"
-                  placeholder="Search tax..."
-                  value={searchFilters.taxCode}
-                  onChange={(e) => setSearchFilters(prev => ({ ...prev, taxCode: e.target.value }))}
-                  className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
-              </div>
+              
             </th>
             
             {/* Amount */}
