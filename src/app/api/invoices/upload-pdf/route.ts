@@ -1,4 +1,4 @@
-// src/app/api/invoices/upload-pdf/route.ts
+// src/app/api/invoices/upload-pdf/route.ts - IMPROVED VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler';
@@ -21,6 +21,30 @@ const getBlobServiceClient = () => {
   };
 };
 
+/**
+ * ✅ IMPROVED: Generate blob-friendly timestamp without special characters
+ */
+function generateBlobFriendlyTimestamp(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hour = String(now.getHours()).padStart(2, '0');
+  const minute = String(now.getMinutes()).padStart(2, '0');
+  const second = String(now.getSeconds()).padStart(2, '0');
+  const millisecond = String(now.getMilliseconds()).padStart(3, '0');
+  
+  // Format: YYYYMMDD-HHMMSS-mmm (blob-friendly, no special chars)
+  return `${year}${month}${day}-${hour}${minute}${second}-${millisecond}`;
+}
+
+/**
+ * ✅ IMPROVED: Sanitize filename to be blob-friendly
+ */
+function sanitizeFileName(fileName: string): string {
+  // Replace problematic characters with underscores
+  return fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+}
 
 export async function POST(request: NextRequest) {
   console.log('🚀 PDF Upload API hit!');
@@ -43,14 +67,16 @@ export async function POST(request: NextRequest) {
       throw new ValidationError(UPLOAD_ERRORS.FILE_TOO_LARGE);
     }
     
-    // Generate unique blob name (simple approach)
+    // ✅ IMPROVED: Generate blob-friendly names
     const now = new Date();
-    const randomId = Math.random().toString(36).substr(2, 9);
-    //const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    const timestamp = now.toISOString();
-    const blobName = `invoices/${year}/${month}/TEMP-${timestamp}_${file.name}`;
+    const timestamp = generateBlobFriendlyTimestamp(); // No special characters
+    const randomId = Math.random().toString(36).substr(2, 9);
+    const sanitizedFileName = sanitizeFileName(file.name);
+    
+    // ✅ IMPROVED: Blob name without URL-problematic characters
+    const blobName = `invoices/${year}/${month}/TEMP-${timestamp}_${sanitizedFileName}`;
     
     console.log(`📤 Uploading PDF: ${blobName}`);
     
@@ -75,22 +101,25 @@ export async function POST(request: NextRequest) {
         originalFileName: file.name,
         uploadedAt: now.toISOString(),
         tempId: `${timestamp}_${randomId}`,
-        status: 'temporary', // ← AGREGAR para cleanup
+        status: 'temporary', // For cleanup
+        year: year.toString(),
+        month: month,
       },
     });
     
     const blobUrl = blockBlobClient.url;
     
     console.log(`✅ PDF uploaded successfully: ${blobUrl}`);
+    console.log(`📋 Blob name for future reference: ${blobName}`);
     
     return createSuccessResponse({
       blobUrl,
       originalFileName: file.name,
       size: file.size,
-      blobName,
+      blobName, // ✅ IMPROVED: Return actual blob name (not URL-encoded)
       tempId: `${timestamp}_${randomId}`,
-      year: now.getFullYear(),        // ← FIX: Agregar year
-      month: now.getMonth() + 1,      // ← FIX: Agregar month
+      year: year,
+      month: parseInt(month),
     });
     
   } catch (error) {

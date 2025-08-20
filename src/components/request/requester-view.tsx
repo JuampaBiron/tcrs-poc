@@ -29,6 +29,7 @@ interface InvoiceData {
   pdfUrl?: string;
   pdfOriginalName?: string;
   pdfTempId?: string;
+  blobName?: string; // ✅ NEW: Direct blob name for Azure operations
 }
 
 interface GLCodingEntry {
@@ -102,11 +103,12 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       // Step 2: Create request with PDF URL and temp ID
       const requestData = {
         ...invoiceData,
-        // Remove File object and add blob URL + temp ID
+        // Remove File object and add blob info
         pdfFile: undefined,
         pdfUrl: pdfUploadResult?.blobUrl,
         pdfOriginalName: pdfUploadResult?.originalFileName,
         pdfTempId: pdfUploadResult?.tempId, // For later PDF renaming
+        blobName: pdfUploadResult?.blobName, // ✅ FIX: Add direct blob name
       };
 
       const formData = new FormData();
@@ -115,6 +117,7 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       formData.append('requester', userEmail);
 
       console.log('🔄 Creating request with PDF URL...');
+      console.log('📋 Request data includes blobName:', !!requestData.blobName);
 
       const response = await fetch('/api/requests/create', {
         method: 'POST',

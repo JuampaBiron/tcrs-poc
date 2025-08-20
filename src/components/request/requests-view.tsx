@@ -1,10 +1,10 @@
-// src/components/request/requests-view.tsx
+// src/components/request/requests-view.tsx - FIXED VERSION
 "use client";
 
 import { useState } from "react";
 import { User } from "next-auth";
 import { USER_ROLES } from "@/constants";
-import { Plus, FileText, Clock, CheckCircle } from "lucide-react";
+import { Plus, FileText, Clock, CheckCircle, Settings } from "lucide-react";
 
 // Import components (to be created)
 import RequesterView from "./requester-view";
@@ -14,6 +14,9 @@ import AdminView from "./admin-view";
 // Type derivation from constants
 type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
 
+// ✅ FIX: Expand activeTab type to include 'admin'
+type ActiveTab = 'create' | 'my-requests' | 'approvals' | 'admin';
+
 interface RequestsViewProps {
   userRole: UserRole;
   userEmail: string;
@@ -21,11 +24,12 @@ interface RequestsViewProps {
 }
 
 export default function RequestsView({ userRole, userEmail, user }: RequestsViewProps) {
-  const [activeTab, setActiveTab] = useState<'create' | 'my-requests' | 'approvals'>('create');
+  // ✅ FIX: Use the expanded ActiveTab type
+  const [activeTab, setActiveTab] = useState<ActiveTab>('create');
 
   // Tab configuration based on role
   const getAvailableTabs = () => {
-    const tabs = [];
+    const tabs: Array<{ id: ActiveTab; label: string; icon: any }> = [];
 
     if (userRole === USER_ROLES.REQUESTER || userRole === USER_ROLES.ADMIN) {
       tabs.push(
@@ -37,6 +41,13 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
     if (userRole === USER_ROLES.APPROVER || userRole === USER_ROLES.ADMIN) {
       tabs.push(
         { id: 'approvals', label: 'Pending Approvals', icon: Clock }
+      );
+    }
+
+    // ✅ FIX: Add admin tab for admin users
+    if (userRole === USER_ROLES.ADMIN) {
+      tabs.push(
+        { id: 'admin', label: 'Administration', icon: Settings }
       );
     }
 
@@ -60,7 +71,7 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => setActiveTab(tab.id)} // ✅ FIX: Now tab.id is properly typed
               className={`
                 group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm
                 ${activeTab === tab.id

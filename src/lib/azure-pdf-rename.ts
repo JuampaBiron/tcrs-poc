@@ -1,4 +1,4 @@
-// src/lib/azure-pdf-rename.ts
+// src/lib/azure-pdf-rename.ts - FIXED VERSION
 import { BlobServiceClient } from '@azure/storage-blob';
 
 const getBlobServiceClient = () => {
@@ -30,24 +30,41 @@ export async function renamePdfWithRequestId(
     const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
     const containerClient = blobServiceClient.getContainerClient(containerName);
     
+    // ✅ FIX: Decode URL-encoded blob name
+    const decodedTempBlobName = decodeURIComponent(tempBlobName);
+    console.log(`🔍 Original blob name: ${tempBlobName}`);
+    console.log(`🔍 Decoded blob name: ${decodedTempBlobName}`);
+    
     // Extract year/month from temp path: "invoices/2025/08/TEMP-..."
-    const pathParts = tempBlobName.split('/');
+    const pathParts = decodedTempBlobName.split('/');
     const year = pathParts[1];
     const month = pathParts[2];
     
-    // Create new blob name with request ID
+    // Create new blob name with request ID - sanitize filename
     const sanitizedFileName = originalFileName.replace(/[^a-zA-Z0-9.-]/g, '_');
     const newBlobName = `invoices/${year}/${month}/${requestId}_${sanitizedFileName}`;
     
-    console.log(`🔄 Renaming PDF: ${tempBlobName} → ${newBlobName}`);
+    console.log(`🔄 Renaming PDF: ${decodedTempBlobName} → ${newBlobName}`);
     
-    // Get source blob
-    const sourceBlobClient = containerClient.getBlobClient(tempBlobName);
+    // ✅ FIX: Use decoded blob name for source
+    const sourceBlobClient = containerClient.getBlobClient(decodedTempBlobName);
     const targetBlobClient = containerClient.getBlobClient(newBlobName);
+    
+    // ✅ FIX: Check if source blob exists before attempting copy
+    const sourceExists = await sourceBlobClient.exists();
+    if (!sourceExists) {
+      throw new Error(`Source blob does not exist: ${decodedTempBlobName}`);
+    }
     
     // Copy blob to new location
     const copyOperation = await targetBlobClient.beginCopyFromURL(sourceBlobClient.url);
     await copyOperation.pollUntilDone();
+    
+    // Check if copy was successful
+    const copyResult = copyOperation.getResult();
+    if (copyResult?.copyStatus !== 'success') {
+      throw new Error(`Copy operation failed with status: ${copyResult?.copyStatus}`);
+    }
     
     // Update metadata to mark as associated
     await targetBlobClient.setMetadata({
@@ -85,7 +102,9 @@ export async function associatePdfWithRequest(
     const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
     const containerClient = blobServiceClient.getContainerClient(containerName);
     
-    const blobClient = containerClient.getBlobClient(blobName);
+    // ✅ FIX: Decode URL-encoded blob name here too
+    const decodedBlobName = decodeURIComponent(blobName);
+    const blobClient = containerClient.getBlobClient(decodedBlobName);
     
     // Get existing metadata
     const properties = await blobClient.getProperties();
@@ -99,7 +118,7 @@ export async function associatePdfWithRequest(
       associatedAt: new Date().toISOString(),
     });
     
-    console.log(`✅ PDF associated with request ${requestId}: ${blobName}`);
+    console.log(`✅ PDF associated with request ${requestId}: ${decodedBlobName}`);
     
   } catch (error) {
     console.error('❌ Failed to associate PDF with request:', error);
