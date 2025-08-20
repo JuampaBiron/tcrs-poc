@@ -4,9 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { renamePdfWithRequestId } from '@/lib/azure-pdf-rename';
 import { db, approvalRequests, invoiceData } from '@/db';
+import { eq } from 'drizzle-orm';
 import { REQUEST_STATUS } from '@/constants';
 import { createId } from '@paralleldrive/cuid2';
-import { eq } from 'drizzle-orm';
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +74,7 @@ async function createRequestInDatabase(data: {
   glCodingData: any;
   requester: string;
 }): Promise<string> {
-  const { invoiceData, requester } = data;
+  const { invoiceData: invoiceFormData, requester } = data;
   
   try {
     // Generate unique request ID
@@ -97,15 +97,15 @@ async function createRequestInDatabase(data: {
       await tx.insert(invoiceData).values({
         invoiceId: createId(),
         requestId,
-        company: invoiceData.company,
-        tcrsCompany: invoiceData.tcrsCompany,
-        branch: invoiceData.branch,
-        vendor: invoiceData.vendor,
-        po: invoiceData.po,
-        amount: invoiceData.amount.toString(), // Convert to decimal string
-        currency: invoiceData.currency,
+        company: invoiceFormData.company,
+        tcrsCompany: invoiceFormData.tcrsCompany,
+        branch: invoiceFormData.branch,
+        vendor: invoiceFormData.vendor,
+        po: invoiceFormData.po,
+        amount: invoiceFormData.amount.toString(), // Convert to decimal string
+        currency: invoiceFormData.currency,
         approver: null, // Will be assigned later
-        blobUrl: invoiceData.pdfUrl || null,
+        blobUrl: invoiceFormData.pdfUrl || null,
         createdDate: new Date(),
         modifiedDate: null,
       });
