@@ -1,9 +1,9 @@
-// src/components/request/gl-coding-table.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 interface GLCodingEntry {
+  id?: string; // Agregar id único
   accountCode: string;
   facilityCode: string;
   taxCode: string;
@@ -23,56 +23,48 @@ interface GLCodingTableProps {
   onEntriesChange: (entries: GLCodingEntry[]) => void;
   dictionaries: Dictionaries;
   onError: (error: string | null) => void;
+  selectedRows: Set<number>;
+  onSelectedRowsChange: (selected: Set<number>) => void;
 }
 
 export default function GLCodingTable({ 
   entries, 
   onEntriesChange, 
   dictionaries, 
-  onError 
+  onError,
+  selectedRows,
+  onSelectedRowsChange
 }: GLCodingTableProps) {
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const [searchFilters, setSearchFilters] = useState({
-    account: '',
-    facility: '',
-    taxCode: ''
-  });
-
-  const updateEntry = (index: number, field: keyof GLCodingEntry, value: any) => {
+  const updateEntry = useCallback((index: number, field: keyof GLCodingEntry, value: any) => {
     const newEntries = entries.map((entry, i) => 
       i === index ? { ...entry, [field]: value } : entry
     );
     onEntriesChange(newEntries);
     onError(null);
-  };
+  }, [entries, onEntriesChange, onError]);
 
-  const toggleRowSelection = (index: number) => {
-    setSelectedRows(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(index)) {
-        newSet.delete(index);
-      } else {
-        newSet.add(index);
-      }
-      return newSet;
-    });
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedRows.size === entries.length && entries.length > 0) {
-      setSelectedRows(new Set());
+  const toggleRowSelection = useCallback((index: number) => {
+    const newSet = new Set(selectedRows);
+    if (newSet.has(index)) {
+      newSet.delete(index);
     } else {
-      setSelectedRows(new Set(entries.map((_, i) => i)));
+      newSet.add(index);
     }
-  };
+    onSelectedRowsChange(newSet);
+  }, [selectedRows, onSelectedRowsChange]);
 
-  // Filter dictionaries based on search
-  const filteredAccounts = dictionaries.accounts;
-  const filteredFacilities = dictionaries.facilities;
-  const filteredTaxCodes = dictionaries.taxCodes;
+  const toggleSelectAll = useCallback(() => {
+    if (selectedRows.size === entries.length && entries.length > 0) {
+      onSelectedRowsChange(new Set());
+    } else {
+      onSelectedRowsChange(new Set(entries.map((_, i) => i)));
+    }
+  }, [selectedRows.size, entries.length, onSelectedRowsChange]);
 
-  // Export selected rows for parent component
-  const getSelectedRows = () => Array.from(selectedRows);
+  const isAllSelected = useMemo(() => 
+    selectedRows.size === entries.length && entries.length > 0, 
+    [selectedRows.size, entries.length]
+  );
 
   return (
     <div className="overflow-x-auto mb-6">
@@ -83,7 +75,7 @@ export default function GLCodingTable({
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               <input
                 type="checkbox"
-                checked={selectedRows.size === entries.length && entries.length > 0}
+                checked={isAllSelected}
                 onChange={toggleSelectAll}
                 className="rounded"
               />
@@ -94,22 +86,19 @@ export default function GLCodingTable({
               #
             </th>
             
-            {/* Account with Search */}
+            {/* Account */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Account *
-              
             </th>
             
-            {/* Facility with Search */}
+            {/* Facility */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Facility *
-              
             </th>
             
-            {/* Tax Code with Search */}
+            {/* Tax Code */}
             <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b">
               Tax Code
-              
             </th>
             
             {/* Amount */}
@@ -132,7 +121,7 @@ export default function GLCodingTable({
         <tbody className="bg-white divide-y divide-gray-200">
           {entries.map((entry, index) => (
             <tr 
-              key={index} 
+              key={entry.id || `entry-${index}`}
               className={`hover:bg-gray-50 ${selectedRows.has(index) ? 'bg-blue-50' : ''}`}
             >
               {/* Row Checkbox */}
@@ -161,7 +150,7 @@ export default function GLCodingTable({
                   required
                 >
                   <option value="">Select Account</option>
-                  {filteredAccounts.map((account) => (
+                  {dictionaries.accounts.map((account) => (
                     <option key={account.accountCode} value={account.accountCode}>
                       {account.accountCombined}
                     </option>
@@ -180,7 +169,7 @@ export default function GLCodingTable({
                   required
                 >
                   <option value="">Select Facility</option>
-                  {filteredFacilities.map((facility) => (
+                  {dictionaries.facilities.map((facility) => (
                     <option key={facility.facilityCode} value={facility.facilityCode}>
                       {facility.facilityCombined}
                     </option>
@@ -196,7 +185,7 @@ export default function GLCodingTable({
                   className="w-full px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
                 >
                   <option value="">Select Tax</option>
-                  {filteredTaxCodes.map((tax) => (
+                  {dictionaries.taxCodes.map((tax) => (
                     <option key={tax.code} value={tax.code}>
                       {tax.code}
                     </option>
@@ -252,11 +241,6 @@ export default function GLCodingTable({
           {selectedRows.size} row(s) selected
         </div>
       )}
-      
-      {/* Export Selected Rows Data for Parent Component */}
-      <div style={{ display: 'none' }}>
-        {JSON.stringify({ selectedRows: getSelectedRows() })}
-      </div>
     </div>
   );
 }

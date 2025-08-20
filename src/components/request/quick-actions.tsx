@@ -2,9 +2,10 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useCallback } from "react";
 
 interface GLCodingEntry {
+  id?: string;
   accountCode: string;
   facilityCode: string;
   taxCode: string;
@@ -18,18 +19,22 @@ interface QuickActionsProps {
   onEntriesChange: (entries: GLCodingEntry[]) => void;
   remainingAmount: number;
   onError: (error: string | null) => void;
+  selectedRows: Set<number>;
+  onSelectedRowsChange: (selected: Set<number>) => void;
 }
 
 export default function QuickActions({ 
   entries, 
   onEntriesChange, 
   remainingAmount, 
-  onError 
+  onError,
+  selectedRows,
+  onSelectedRowsChange
 }: QuickActionsProps) {
-  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-
-  const addEntry = () => {
+  
+  const addEntry = useCallback(() => {
     const newEntry: GLCodingEntry = {
+      id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       accountCode: '',
       facilityCode: '',
       taxCode: '',
@@ -40,44 +45,35 @@ export default function QuickActions({
     
     onEntriesChange([...entries, newEntry]);
     onError(null);
-  };
+  }, [entries, onEntriesChange, remainingAmount, onError]);
 
-  const removeSelectedEntries = () => {
-    // Get selected rows from DOM (simplified approach)
-    const checkboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-    const selectedIndices: number[] = [];
-    
-    checkboxes.forEach((checkbox, index) => {
-      // Skip the "select all" checkbox (first one)
-      if (index > 0) {
-        selectedIndices.push(index - 1);
-      }
-    });
-
-    if (selectedIndices.length === 0) {
+  const removeSelectedEntries = useCallback(() => {
+    if (selectedRows.size === 0) {
       onError('No rows selected');
       return;
     }
 
-    if (entries.length - selectedIndices.length < 1) {
+    if (entries.length - selectedRows.size < 1) {
       onError('Cannot delete all entries. At least one entry is required.');
       return;
     }
 
-    const confirmed = window.confirm(`Are you sure you want to delete ${selectedIndices.length} selected row(s)?`);
+    const confirmed = window.confirm(`Are you sure you want to delete ${selectedRows.size} selected row(s)?`);
     
     if (confirmed) {
-      const updatedEntries = entries.filter((_, index) => !selectedIndices.includes(index));
-      onEntriesChange(updatedEntries);
-      onError(null);
+      // Ordenar índices de mayor a menor para eliminar correctamente
+      const sortedIndices = Array.from(selectedRows).sort((a, b) => b - a);
+      const updatedEntries = [...entries];
       
-      // Clear all checkboxes
-      const allCheckboxes = document.querySelectorAll('input[type="checkbox"]');
-      allCheckboxes.forEach(checkbox => {
-        (checkbox as HTMLInputElement).checked = false;
+      sortedIndices.forEach(index => {
+        updatedEntries.splice(index, 1);
       });
+      
+      onEntriesChange(updatedEntries);
+      onSelectedRowsChange(new Set()); // Limpiar selección
+      onError(null);
     }
-  };
+  }, [entries, selectedRows, onEntriesChange, onSelectedRowsChange, onError]);
 
   return (
     <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -93,11 +89,11 @@ export default function QuickActions({
 
         <button
           onClick={removeSelectedEntries}
-          disabled={entries.length <= 1}
+          disabled={entries.length <= 1 || selectedRows.size === 0}
           className="flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Trash2 className="w-4 h-4 mr-1" />
-          Delete Selected
+          Delete Selected ({selectedRows.size})
         </button>
       </div>
 

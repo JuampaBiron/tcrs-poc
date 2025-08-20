@@ -9,6 +9,7 @@ import QuickActions from "./quick-actions";
 import ErrorMessage from "@/components/ui/error-message";
 
 interface GLCodingEntry {
+  id?: string; // Agregar id opcional para tracking
   accountCode: string;
   facilityCode: string;
   taxCode: string;
@@ -38,6 +39,7 @@ export default function GLCodingFormImproved({
 }: GLCodingFormProps) {
   const [entries, setEntries] = useState<GLCodingEntry[]>(
     initialData.length > 0 ? initialData : [{
+      id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       accountCode: '',
       facilityCode: '',
       taxCode: '',
@@ -46,6 +48,9 @@ export default function GLCodingFormImproved({
       comments: ''
     }]
   );
+
+  // Estado para filas seleccionadas
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
 
   const [inputMode, setInputMode] = useState<'table' | 'excel'>('table');
   const [dictionaries, setDictionaries] = useState<Dictionaries>({
@@ -116,10 +121,32 @@ export default function GLCodingFormImproved({
   };
 
   const handleExcelImport = (importedEntries: GLCodingEntry[]) => {
-    setEntries(importedEntries);
+    // Asegurar que las entradas importadas tengan IDs únicos
+    const entriesWithIds = importedEntries.map((entry, index) => ({
+      ...entry,
+      id: entry.id || `gl-import-${Date.now()}-${index}`
+    }));
+    
+    setEntries(entriesWithIds);
+    setSelectedRows(new Set()); // Limpiar selección
     setShowExcelModal(false);
     setInputMode('table');
     setError(null);
+  };
+
+  // Handler para cambios en las entradas que también limpia selecciones inválidas
+  const handleEntriesChange = (newEntries: GLCodingEntry[]) => {
+    setEntries(newEntries);
+    
+    // Limpiar selecciones que ya no son válidas
+    const maxIndex = newEntries.length - 1;
+    const validSelections = new Set(
+      Array.from(selectedRows).filter(index => index <= maxIndex)
+    );
+    
+    if (validSelections.size !== selectedRows.size) {
+      setSelectedRows(validSelections);
+    }
   };
 
   return (
@@ -171,17 +198,21 @@ export default function GLCodingFormImproved({
       {/* Quick Actions */}
       <QuickActions
         entries={entries}
-        onEntriesChange={setEntries}
+        onEntriesChange={handleEntriesChange}
         remainingAmount={remainingAmount}
         onError={setError}
+        selectedRows={selectedRows}
+        onSelectedRowsChange={setSelectedRows}
       />
 
       {/* Main Table */}
       <GLCodingTable
         entries={entries}
-        onEntriesChange={setEntries}
+        onEntriesChange={handleEntriesChange}
         dictionaries={dictionaries}
         onError={setError}
+        selectedRows={selectedRows}
+        onSelectedRowsChange={setSelectedRows}
       />
 
       {/* Status Summary */}
