@@ -59,16 +59,16 @@ export function usePdfUpload(): UsePdfUploadReturn {
         throw new Error(result.error || UPLOAD_ERRORS.UPLOAD_FAILED);
       }
 
-      console.log('✅ PDF upload successful:', result.blobUrl);
+      console.log('✅ PDF upload successful:', result.data?.blobUrl);
       
-      return {
-        blobUrl: result.blobUrl,
-        originalFileName: result.originalFileName,
-        size: result.size,
-        blobName: result.blobName,
-        tempId: result.tempId || Date.now().toString(), // ← AGREGAR con fallback
-        year: result.year,     // ← AGREGAR
-        month: result.month,   // ← AGREGAR
+     return {
+        blobUrl: result.data.blobUrl,                    // ✅ Agregar .data
+        originalFileName: result.data.originalFileName,  // ✅ Agregar .data
+        size: result.data.size,                         // ✅ Agregar .data
+        blobName: result.data.blobName,                 // ✅ Agregar .data
+        tempId: result.data.tempId || Date.now().toString(), // ✅ Agregar .data
+        year: result.data.year,                         // ✅ Agregar .data
+        month: result.data.month,                       // ✅ Agregar .data
       };
 
     } catch (err) {

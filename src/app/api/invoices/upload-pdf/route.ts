@@ -8,9 +8,9 @@ import { FILE_UPLOAD, UPLOAD_ERRORS } from '@/constants';
 const getBlobServiceClient = () => {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
   
-  if (!accountName || !accountKey || !containerName) {
+  if (!accountName || !accountKey) {
     throw new Error('Azure Storage credentials not configured');
   }
   
@@ -20,6 +20,7 @@ const getBlobServiceClient = () => {
     containerName
   };
 };
+
 
 export async function POST(request: NextRequest) {
   console.log('🚀 PDF Upload API hit!');
