@@ -46,6 +46,45 @@ export const UPLOAD_ERRORS = {
   NO_FILE: 'No file provided',
 } as const;
 
+export const ERROR_MESSAGES = {
+  // Server errors
+  SERVER_ERROR: 'Internal server error. Please try again later.',
+  GENERIC: 'An unexpected error occurred. Please try again.',
+  
+  // Authentication errors
+  UNAUTHORIZED: 'You are not authorized to perform this action.',
+  NOT_AUTHENTICATED: 'Please log in to continue.',
+  SESSION_EXPIRED: 'Your session has expired. Please log in again.',
+  
+  // Validation errors
+  VALIDATION: 'Invalid data provided. Please check your input.',
+  REQUIRED_FIELD: 'This field is required.',
+  INVALID_FORMAT: 'Invalid format provided.',
+  
+  // Request specific errors
+  REQUEST_NOT_FOUND: 'Request not found.',
+  REQUEST_ALREADY_PROCESSED: 'This request has already been processed.',
+  INSUFFICIENT_PERMISSIONS: 'You do not have permission to access this request.',
+  
+  // Database errors
+  DATABASE_ERROR: 'Database operation failed. Please try again.',
+  CONNECTION_ERROR: 'Unable to connect to database.',
+  
+  // Network errors
+  NETWORK: 'Network error. Please check your connection and try again.',
+  TIMEOUT: 'Request timed out. Please try again.',
+  
+  // File upload errors
+  FILE_TOO_LARGE: 'File size exceeds the maximum limit.',
+  INVALID_FILE_TYPE: 'Invalid file type. Please upload a valid file.',
+  UPLOAD_FAILED: 'File upload failed. Please try again.',
+  
+  // Business logic errors
+  AMOUNT_EXCEEDS_LIMIT: 'Amount exceeds the authorized limit.',
+  INVALID_APPROVER: 'Invalid approver assigned to this request.',
+  WORKFLOW_ERROR: 'Workflow processing error occurred.',
+} as const;
+
 export const ROUTES = {
   HOME: "/",
   DASHBOARD: "/dashboard",
