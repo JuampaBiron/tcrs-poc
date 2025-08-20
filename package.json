@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.10.0",
+    "@azure/storage-blob": "^12.28.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "@neondatabase/serverless": "^1.0.1",
     "@radix-ui/react-slot": "^1.2.3",

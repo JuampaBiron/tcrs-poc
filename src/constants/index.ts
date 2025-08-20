@@ -1,9 +1,19 @@
 // src/constants/index.ts
+
 // Application constants
 export const USER_ROLES = {
   REQUESTER: "requester",
   APPROVER: "approver",
   ADMIN: "admin",
+} as const;
+
+// File upload constraints
+export const FILE_UPLOAD = {
+  PDF: {
+    MAX_SIZE: 10 * 1024 * 1024, // 10MB
+    ALLOWED_TYPES: ['application/pdf'],
+    MIME_TYPE: 'application/pdf'
+  }
 } as const;
 
 export const REQUEST_STATUS = {
@@ -19,6 +29,21 @@ export const API_ROUTES = {
   EXPORT: "/api/export",
   AUTH: "/api/auth",
   DICTIONARIES: "/api/dictionaries",
+  UPLOAD_PDF: "/api/invoices/upload-pdf",
+} as const;
+
+// Azure Blob Storage constants
+export const AZURE_STORAGE = {
+  CONTAINER_NAME: process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf',
+  BASE_URL: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net`,
+} as const;
+
+// File upload error messages
+export const UPLOAD_ERRORS = {
+  FILE_TOO_LARGE: 'File size exceeds 10MB limit',
+  INVALID_TYPE: 'Only PDF files are allowed',
+  UPLOAD_FAILED: 'Failed to upload PDF to storage',
+  NO_FILE: 'No file provided',
 } as const;
 
 export const ROUTES = {

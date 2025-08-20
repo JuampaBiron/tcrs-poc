@@ -103,3 +103,25 @@ export interface DbApprovalRequest {
   createdDate: Date | null
   modifiedDate: Date | null
 }
+
+export interface InvoiceData {
+  company: string;
+  branch: string;
+  tcrsCompany: boolean;
+  vendor: string;
+  po: string;
+  amount: number;
+  currency: string;
+  // PDF handling - keep File for form, add URL for storage
+  pdfFile?: File;           // For form handling (client-side)
+  pdfUrl?: string;          // For database storage (blob URL)
+  pdfOriginalName?: string; // Original filename for display
+}
+
+// Upload result from API
+export interface PdfUploadResult {
+  blobUrl: string;
+  originalFileName: string;
+  size: number;
+  blobName: string;
+}

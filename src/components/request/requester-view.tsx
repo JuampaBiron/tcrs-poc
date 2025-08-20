@@ -9,6 +9,7 @@ import GLCodingForm from "./gl-coding-form";
 import MyRequestsList from "./my-requests-list";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
+import { usePdfUpload } from "@/hooks/use-pdf-upload";
 
 interface RequesterViewProps {
   mode: 'create' | 'list';
@@ -25,6 +26,9 @@ interface InvoiceData {
   amount: number;
   currency: string;
   pdfFile?: File;
+  pdfUrl?: string;
+  pdfOriginalName?: string;
+  pdfTempId?: string;
 }
 
 interface GLCodingEntry {
@@ -43,6 +47,9 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // PDF Upload hook
+  const { uploadPdf, uploading: pdfUploading, error: pdfError } = usePdfUpload();
 
   // Show list view
   if (mode === 'list') {
@@ -76,17 +83,38 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
     setError(null);
 
     try {
-      const formData = new FormData();
+      let pdfUploadResult = null;
       
-      // Add invoice data
-      formData.append('invoiceData', JSON.stringify(invoiceData));
+      // Step 1: Upload PDF if present
+      if (invoiceData.pdfFile) {
+        console.log('🔄 Uploading PDF before creating request...');
+        try {
+          // No need for requestId - use direct naming
+          pdfUploadResult = await uploadPdf(invoiceData.pdfFile, 'direct');
+          console.log('✅ PDF uploaded successfully:', pdfUploadResult.blobUrl);
+        } catch (pdfErr) {
+          console.error('❌ PDF upload failed:', pdfErr);
+          setError(`PDF upload failed: ${pdfErr instanceof Error ? pdfErr.message : 'Unknown error'}`);
+          return;
+        }
+      }
+
+      // Step 2: Create request with PDF URL and temp ID
+      const requestData = {
+        ...invoiceData,
+        // Remove File object and add blob URL + temp ID
+        pdfFile: undefined,
+        pdfUrl: pdfUploadResult?.blobUrl,
+        pdfOriginalName: pdfUploadResult?.originalFileName,
+        pdfTempId: pdfUploadResult?.tempId, // For later PDF renaming
+      };
+
+      const formData = new FormData();
+      formData.append('invoiceData', JSON.stringify(requestData));
       formData.append('glCodingData', JSON.stringify(glCodingData));
       formData.append('requester', userEmail);
-      
-      // Add PDF file if present
-      if (invoiceData.pdfFile) {
-        formData.append('pdfFile', invoiceData.pdfFile);
-      }
+
+      console.log('🔄 Creating request with PDF URL...');
 
       const response = await fetch('/api/requests/create', {
         method: 'POST',
@@ -99,6 +127,7 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
         throw new Error(result.error || 'Failed to create request');
       }
 
+      console.log('✅ Request created successfully with PDF');
       setSuccess(true);
       setCurrentStep('submit');
       
@@ -111,6 +140,7 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       }, 3000);
 
     } catch (err) {
+      console.error('❌ Request creation failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to create request');
     } finally {
       setLoading(false);
@@ -126,6 +156,9 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
     setCurrentStep('gl-coding');
     setError(null);
   };
+
+  // Combined loading state
+  const isSubmitting = loading || pdfUploading;
 
   if (success) {
     return (
@@ -185,17 +218,29 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
             }`}>
               {currentStep === 'submit' ? <Check className="w-4 h-4" /> : '3'}
             </div>
-            <span className="ml-2 font-medium">Review & Submit</span>
+            <span className="ml-2 font-medium">Validation</span>
           </div>
         </div>
       </div>
 
       {/* Error Display */}
-      {error && <ErrorMessage message={error} />}
+      {(error || pdfError) && (
+        <ErrorMessage 
+          message={error || pdfError || 'An error occurred'} 
+          onRetry={() => {
+            setError(null);
+            // Clear any PDF errors as well
+            if (pdfError) {
+              // The hook will handle clearing its own error state
+              console.log('Clearing error state');
+            }
+          }} 
+        />
+      )}
 
       {/* Step Content */}
       {currentStep === 'invoice' && (
-        <InvoiceForm 
+        <InvoiceForm
           onSubmit={handleInvoiceSubmit}
           initialData={invoiceData}
         />
@@ -210,85 +255,114 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
         />
       )}
 
-      {currentStep === 'validation' && (
+      {currentStep === 'validation' && invoiceData && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Review & Validation</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Review & Submit Request</h3>
           
-          {/* Amount Validation */}
-          <div className={`rounded-lg p-4 mb-6 ${amountsMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
-            <div className="flex items-center">
-              {amountsMatch ? (
-                <Check className="w-5 h-5 text-green-600 mr-2" />
-              ) : (
-                <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-              )}
-              <div>
-                <p className={`font-medium ${amountsMatch ? 'text-green-800' : 'text-red-800'}`}>
-                  {amountsMatch ? 'Amounts Match' : 'Amount Mismatch'}
-                </p>
-                <p className={`text-sm ${amountsMatch ? 'text-green-600' : 'text-red-600'}`}>
-                  Invoice Total: ${invoiceTotal.toFixed(2)} | GL Coding Total: ${glCodingTotal.toFixed(2)}
-                </p>
+          {/* Invoice Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900 flex items-center">
+                <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                Invoice Details
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Company:</span>
+                  <span className="text-sm font-medium">{invoiceData.company}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Branch:</span>
+                  <span className="text-sm font-medium">{invoiceData.branch}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Vendor:</span>
+                  <span className="text-sm font-medium">{invoiceData.vendor}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">PO#:</span>
+                  <span className="text-sm font-medium">{invoiceData.po || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Amount:</span>
+                  <span className="text-sm font-medium">{invoiceData.currency} {invoiceData.amount.toFixed(2)}</span>
+                </div>
+                {invoiceData.pdfFile && (
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">PDF:</span>
+                    <span className="text-sm font-medium text-green-600">{invoiceData.pdfFile.name}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-900 flex items-center">
+                <DollarSign className="w-5 h-5 mr-2 text-green-600" />
+                GL Coding Summary
+              </h4>
+              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Total Entries:</span>
+                  <span className="text-sm font-medium">{glCodingData.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">GL Coding Total:</span>
+                  <span className="text-sm font-medium">{invoiceData.currency} {glCodingTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">Invoice Total:</span>
+                  <span className="text-sm font-medium">{invoiceData.currency} {invoiceTotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-gray-200">
+                  <span className="text-sm font-medium text-gray-900">Status:</span>
+                  <span className={`text-sm font-medium ${amountsMatch ? 'text-green-600' : 'text-red-600'}`}>
+                    {amountsMatch ? '✓ Amounts Match' : '✗ Amounts Mismatch'}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Invoice Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Company:</span>
-                  <span>{invoiceData?.company}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Vendor:</span>
-                  <span>{invoiceData?.vendor}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Amount:</span>
-                  <span>${invoiceData?.amount} {invoiceData?.currency}</span>
+          {/* Amount Validation Alert */}
+          {!amountsMatch && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                <div>
+                  <h4 className="text-sm font-medium text-red-800">Amount Mismatch</h4>
+                  <p className="text-sm text-red-700 mt-1">
+                    The GL coding total ({invoiceData.currency} {glCodingTotal.toFixed(2)}) does not match 
+                    the invoice amount ({invoiceData.currency} {invoiceTotal.toFixed(2)}). 
+                    Please review your entries before submitting.
+                  </p>
                 </div>
               </div>
             </div>
-            
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">GL Coding Summary</h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Entries:</span>
-                  <span>{glCodingData.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Total Amount:</span>
-                  <span>${glCodingTotal.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex justify-between">
             <button
-              type="button"
               onClick={handleBackToGLCoding}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
             >
               Back to GL Coding
             </button>
             
             <button
-              type="button"
               onClick={handleFinalSubmit}
-              disabled={!amountsMatch || loading}
-              className={`px-6 py-2 text-sm font-medium text-white rounded-md ${
-                amountsMatch && !loading 
-                  ? 'bg-blue-600 hover:bg-blue-700' 
-                  : 'bg-gray-400 cursor-not-allowed'
-              }`}
+              disabled={isSubmitting || !amountsMatch}
+              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <LoadingSpinner /> : 'Submit Request'}
+              {isSubmitting ? (
+                <div className="flex items-center space-x-2">
+                  <LoadingSpinner size="sm" />
+                  <span>{pdfUploading ? 'Uploading PDF...' : 'Creating Request...'}</span>
+                </div>
+              ) : (
+                'Submit Request'
+              )}
             </button>
           </div>
         </div>
