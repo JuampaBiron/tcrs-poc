@@ -136,10 +136,23 @@ export default function GLCodingFormImproved({
 
   // Handler para cambios en las entradas que también limpia selecciones inválidas
   const handleEntriesChange = (newEntries: GLCodingEntry[]) => {
-    setEntries(newEntries);
+    // Asegurar que siempre hay al menos una entrada
+    const finalEntries = newEntries.length === 0 
+      ? [{
+          id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          accountCode: '',
+          facilityCode: '',
+          taxCode: '',
+          amount: 0,
+          equipment: '',
+          comments: ''
+        }]
+      : newEntries;
+      
+    setEntries(finalEntries);
     
     // Limpiar selecciones que ya no son válidas
-    const maxIndex = newEntries.length - 1;
+    const maxIndex = finalEntries.length - 1;
     const validSelections = new Set(
       Array.from(selectedRows).filter(index => index <= maxIndex)
     );

@@ -1,4 +1,3 @@
-// src/components/request/quick-actions.tsx
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
@@ -47,14 +46,19 @@ export default function QuickActions({
     onError(null);
   }, [entries, onEntriesChange, remainingAmount, onError]);
 
+  const createEmptyEntry = useCallback((): GLCodingEntry => ({
+    id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    accountCode: '',
+    facilityCode: '',
+    taxCode: '',
+    amount: 0,
+    equipment: '',
+    comments: ''
+  }), []);
+
   const removeSelectedEntries = useCallback(() => {
     if (selectedRows.size === 0) {
       onError('No rows selected');
-      return;
-    }
-
-    if (entries.length - selectedRows.size < 1) {
-      onError('Cannot delete all entries. At least one entry is required.');
       return;
     }
 
@@ -69,11 +73,16 @@ export default function QuickActions({
         updatedEntries.splice(index, 1);
       });
       
-      onEntriesChange(updatedEntries);
+      // Si no quedan entradas, crear una nueva vacía
+      const finalEntries = updatedEntries.length === 0 
+        ? [createEmptyEntry()] 
+        : updatedEntries;
+      
+      onEntriesChange(finalEntries);
       onSelectedRowsChange(new Set()); // Limpiar selección
       onError(null);
     }
-  }, [entries, selectedRows, onEntriesChange, onSelectedRowsChange, onError]);
+  }, [entries, selectedRows, onEntriesChange, onSelectedRowsChange, onError, createEmptyEntry]);
 
   return (
     <div className="flex flex-wrap gap-2 mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
@@ -89,7 +98,7 @@ export default function QuickActions({
 
         <button
           onClick={removeSelectedEntries}
-          disabled={entries.length <= 1 || selectedRows.size === 0}
+          disabled={selectedRows.size === 0}
           className="flex items-center px-3 py-1 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Trash2 className="w-4 h-4 mr-1" />
