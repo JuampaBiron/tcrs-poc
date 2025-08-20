@@ -7,10 +7,13 @@ interface UploadResult {
   originalFileName: string;
   size: number;
   blobName: string;
+  tempId: string;    // ← AGREGAR
+  year?: number;     // ← AGREGAR (opcional)
+  month?: number;    // ← AGREGAR (opcional)
 }
 
 interface UsePdfUploadReturn {
-  uploadPdf: (file: File, requestId: string) => Promise<UploadResult>;
+  uploadPdf: (file: File, context?: string) => Promise<UploadResult>; // ← Cambiar requestId por context opcional
   uploading: boolean;
   error: string | null;
   progress: number;
@@ -26,20 +29,19 @@ export function usePdfUpload(): UsePdfUploadReturn {
     setError(null);
   }, []);
 
-  const uploadPdf = useCallback(async (file: File, requestId: string): Promise<UploadResult> => {
+  const uploadPdf = useCallback(async (file: File, context: string = 'direct'): Promise<UploadResult> => {
     setUploading(true);
     setError(null);
     setProgress(0);
 
     try {
-      // Simulate progress for better UX
       const progressInterval = setInterval(() => {
         setProgress(prev => Math.min(prev + 10, 90));
       }, 100);
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('requestId', requestId);
+      formData.append('context', context); // ← CAMBIAR de requestId a context
 
       console.log('🔄 Uploading PDF to Azure Blob Storage...');
 
@@ -64,6 +66,9 @@ export function usePdfUpload(): UsePdfUploadReturn {
         originalFileName: result.originalFileName,
         size: result.size,
         blobName: result.blobName,
+        tempId: result.tempId || Date.now().toString(), // ← AGREGAR con fallback
+        year: result.year,     // ← AGREGAR
+        month: result.month,   // ← AGREGAR
       };
 
     } catch (err) {
@@ -73,7 +78,6 @@ export function usePdfUpload(): UsePdfUploadReturn {
       throw err;
     } finally {
       setUploading(false);
-      // Reset progress after a short delay
       setTimeout(() => setProgress(0), 1000);
     }
   }, []);

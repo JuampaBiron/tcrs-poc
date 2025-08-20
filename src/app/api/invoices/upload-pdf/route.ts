@@ -23,15 +23,11 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const requestId = formData.get('requestId') as string;
+    const context = formData.get('context') as string || 'direct'; // ← CAMBIAR requestId por context
     
     // Validation
     if (!file) {
       throw new ValidationError(UPLOAD_ERRORS.NO_FILE);
-    }
-    
-    if (!requestId) {
-      throw new ValidationError('Request ID is required');
     }
     
     // Validate file type
@@ -44,10 +40,11 @@ export async function POST(request: NextRequest) {
       throw new ValidationError(UPLOAD_ERRORS.FILE_TOO_LARGE);
     }
     
-    // Generate unique blob name
+    // Generate unique blob name (simple approach)
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const randomId = Math.random().toString(36).substr(2, 9);
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const blobName = `invoices/${requestId}/${timestamp}_${sanitizedFileName}`;
+    const blobName = `invoices/${timestamp}_${randomId}_${sanitizedFileName}`;
     
     console.log(`📤 Uploading PDF: ${blobName}`);
     
@@ -72,9 +69,10 @@ export async function POST(request: NextRequest) {
         blobContentDisposition: `attachment; filename="${file.name}"`,
       },
       metadata: {
-        requestId: requestId,
+        context: context,                    // ← CAMBIAR de requestId
         originalFileName: file.name,
         uploadedAt: new Date().toISOString(),
+        tempId: `${timestamp}_${randomId}`,  // ← AGREGAR tempId
       },
     });
     
@@ -87,6 +85,7 @@ export async function POST(request: NextRequest) {
       originalFileName: file.name,
       size: file.size,
       blobName,
+      tempId: `${timestamp}_${randomId}`, // ← AGREGAR tempId en respuesta
     });
     
   } catch (error) {
