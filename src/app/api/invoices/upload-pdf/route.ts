@@ -23,25 +23,24 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const file = formData.get('file') as File;
-    const context = formData.get('context') as string || 'direct'; // ← CAMBIAR requestId por context
+    const context = formData.get('context') as string || 'direct';
     
     // Validation
     if (!file) {
       throw new ValidationError(UPLOAD_ERRORS.NO_FILE);
     }
     
-    // Validate file type
     if (file.type !== FILE_UPLOAD.PDF.MIME_TYPE) {
       throw new ValidationError(UPLOAD_ERRORS.INVALID_TYPE);
     }
     
-    // Validate file size
     if (file.size > FILE_UPLOAD.PDF.MAX_SIZE) {
       throw new ValidationError(UPLOAD_ERRORS.FILE_TOO_LARGE);
     }
     
     // Generate unique blob name (simple approach)
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, '-');
     const randomId = Math.random().toString(36).substr(2, 9);
     const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const blobName = `invoices/${timestamp}_${randomId}_${sanitizedFileName}`;
@@ -53,26 +52,24 @@ export async function POST(request: NextRequest) {
     const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
     const containerClient = blobServiceClient.getContainerClient(containerName);
     
-    // Ensure container exists (private by default)
     await containerClient.createIfNotExists();
     
     const blockBlobClient = containerClient.getBlockBlobClient(blobName);
     
-    // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     
-    // Upload with metadata
     await blockBlobClient.uploadData(buffer, {
       blobHTTPHeaders: {
         blobContentType: file.type,
         blobContentDisposition: `attachment; filename="${file.name}"`,
       },
       metadata: {
-        context: context,                    // ← CAMBIAR de requestId
+        context: context,
         originalFileName: file.name,
-        uploadedAt: new Date().toISOString(),
-        tempId: `${timestamp}_${randomId}`,  // ← AGREGAR tempId
+        uploadedAt: now.toISOString(),
+        tempId: `${timestamp}_${randomId}`,
+        status: 'temporary', // ← AGREGAR para cleanup
       },
     });
     
@@ -85,7 +82,9 @@ export async function POST(request: NextRequest) {
       originalFileName: file.name,
       size: file.size,
       blobName,
-      tempId: `${timestamp}_${randomId}`, // ← AGREGAR tempId en respuesta
+      tempId: `${timestamp}_${randomId}`,
+      year: now.getFullYear(),        // ← FIX: Agregar year
+      month: now.getMonth() + 1,      // ← FIX: Agregar month
     });
     
   } catch (error) {
