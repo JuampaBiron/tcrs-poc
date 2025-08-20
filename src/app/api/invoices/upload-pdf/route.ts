@@ -8,13 +8,17 @@ import { FILE_UPLOAD, UPLOAD_ERRORS } from '@/constants';
 const getBlobServiceClient = () => {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME;
   
-  if (!accountName || !accountKey) {
+  if (!accountName || !accountKey || !containerName) {
     throw new Error('Azure Storage credentials not configured');
   }
   
   const connectionString = `DefaultEndpointsProtocol=https;AccountName=${accountName};AccountKey=${accountKey};EndpointSuffix=core.windows.net`;
-  return BlobServiceClient.fromConnectionString(connectionString);
+  return {
+    client: BlobServiceClient.fromConnectionString(connectionString),
+    containerName
+  };
 };
 
 export async function POST(request: NextRequest) {
@@ -40,16 +44,17 @@ export async function POST(request: NextRequest) {
     
     // Generate unique blob name (simple approach)
     const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, '-');
     const randomId = Math.random().toString(36).substr(2, 9);
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const blobName = `invoices/${timestamp}_${randomId}_${sanitizedFileName}`;
+    //const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const timestamp = now.toISOString();
+    const blobName = `invoices/${year}/${month}/TEMP-${timestamp}_${file.name}`;
     
     console.log(`📤 Uploading PDF: ${blobName}`);
     
     // Upload to Azure Blob Storage
-    const blobServiceClient = getBlobServiceClient();
-    const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
+    const { client: blobServiceClient, containerName } = getBlobServiceClient();
     const containerClient = blobServiceClient.getContainerClient(containerName);
     
     await containerClient.createIfNotExists();
