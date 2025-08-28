@@ -1,4 +1,4 @@
-// src/components/request/requests-view.tsx - FIXED VERSION
+// src/components/request/requests-view.tsx 
 "use client";
 
 import { useState } from "react";
@@ -31,20 +31,20 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
   const getAvailableTabs = () => {
     const tabs: Array<{ id: ActiveTab; label: string; icon: any }> = [];
 
-    if (userRole === USER_ROLES.REQUESTER || userRole === USER_ROLES.ADMIN) {
+    if (userRole === USER_ROLES.REQUESTER) {
       tabs.push(
         { id: 'create', label: 'Create Request', icon: Plus },
         { id: 'my-requests', label: 'My Requests', icon: FileText }
       );
     }
 
-    if (userRole === USER_ROLES.APPROVER || userRole === USER_ROLES.ADMIN) {
+    if (userRole === USER_ROLES.APPROVER) {
       tabs.push(
         { id: 'approvals', label: 'Pending Approvals', icon: Clock }
       );
     }
 
-    // ✅ FIX: Add admin tab for admin users
+    // Add admin tab for admin users. Yo creo que admin no debería tener acceso a esta view.
     if (userRole === USER_ROLES.ADMIN) {
       tabs.push(
         { id: 'admin', label: 'Administration', icon: Settings }
@@ -71,7 +71,7 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
           {tabs.map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)} // ✅ FIX: Now tab.id is properly typed
+              onClick={() => setActiveTab(tab.id)} 
               className={`
                 group inline-flex items-center py-4 px-1 border-b-2 font-medium text-sm
                 ${activeTab === tab.id
@@ -95,7 +95,7 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
       {/* Tab Content */}
       <div className="mt-6">
         {/* Requester Views */}
-        {(userRole === USER_ROLES.REQUESTER || userRole === USER_ROLES.ADMIN) && (
+        {(userRole === USER_ROLES.REQUESTER) && (
           <>
             {activeTab === 'create' && (
               <RequesterView 

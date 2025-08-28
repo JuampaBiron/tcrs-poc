@@ -7,9 +7,9 @@ interface UploadResult {
   originalFileName: string;
   size: number;
   blobName: string;
-  tempId: string;    // ← AGREGAR
-  year?: number;     // ← AGREGAR (opcional)
-  month?: number;    // ← AGREGAR (opcional)
+  tempId: string;    
+  year?: number;     
+  month?: number;    
 }
 
 interface UsePdfUploadReturn {

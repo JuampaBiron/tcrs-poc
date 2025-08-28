@@ -6,6 +6,7 @@ import { Upload, FileText, X } from "lucide-react";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import { DICTIONARY_FALLBACKS, API_ROUTES } from "@/constants";
+import { useCompanies } from "@/hooks/useCompanies";
 
 interface InvoiceData {
   company: string;
@@ -46,23 +47,19 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
   });
 
   // Separate states for dropdown data
-  const [companies, setCompanies] = useState<DictionaryItem[]>([...DICTIONARY_FALLBACKS.companies]);
   const [branches, setBranches] = useState<DictionaryItem[]>([]);
   const [currencies, setCurrencies] = useState<CurrencyItem[]>([...DICTIONARY_FALLBACKS.currencies]);
 
   // Loading states
-  const [loadingCompanies, setLoadingCompanies] = useState(true);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   // Error states
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Load companies on mount
-  useEffect(() => {
-    loadCompanies();
-  }, []);
+  // Usar hook para obtener companies (sin fallback)
+  const { data: companies, isLoading: loadingCompanies, error: companiesError } = useCompanies();
 
   // Load branches when company changes
   useEffect(() => {
@@ -73,42 +70,16 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     }
   }, [formData.company]);
 
-  const loadCompanies = async () => {
-    try {
-      setLoadingCompanies(true);
-      console.log('🏢 Loading companies...');
-      
-      const response = await fetch(`${API_ROUTES.DICTIONARIES}/companies`);
-      if (!response.ok) {
-        throw new Error('Failed to load companies');
-      }
-      
-      const data = await response.json();
-      if (data.success && data.data?.companies) {
-        setCompanies(data.data.companies);
-        console.log(`✅ Loaded ${data.data.companies.length} companies from DB`);
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (err) {
-      console.error('❌ Error loading companies:', err);
-      console.log('📋 Using fallback companies');
-      // Keep using fallback data already set in useState
-    } finally {
-      setLoadingCompanies(false);
-    }
-  };
-
   const loadBranches = async (companyErp: string) => {
     try {
       setLoadingBranches(true);
       console.log(`🏗️ Loading branches for company: ${companyErp}`);
-      
+
       const response = await fetch(`${API_ROUTES.DICTIONARIES}/branches?erp=${encodeURIComponent(companyErp)}`);
       if (!response.ok) {
         throw new Error('Failed to load branches');
       }
-      
+
       const data = await response.json();
       if (data.success && data.data?.branches) {
         setBranches(data.data.branches);
@@ -128,15 +99,15 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
   const handleInputChange = (field: keyof InvoiceData, value: any) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-      
+
       // If company changes, reset branch
       if (field === 'company' && value !== prev.company) {
         newData.branch = '';
       }
-      
+
       return newData;
     });
-    
+
     // Clear error when user starts typing
     if (error) {
       setError(null);
@@ -154,7 +125,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     setDragActive(false);
-    
+
     const files = Array.from(e.dataTransfer.files);
     if (files.length > 0) {
       handleFileUpload(files[0]);
@@ -199,7 +170,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Invoice Information</h3>
-      
+
       {error && <ErrorMessage message={error} />}
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -219,9 +190,13 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
                 required
               >
                 <option value="">
-                  {loadingCompanies ? "Loading companies..." : "Select Company"}
+                  {loadingCompanies
+                    ? "Loading companies..."
+                    : companiesError
+                    ? "Error loading companies"
+                    : "Select Company"}
                 </option>
-                {companies.map((company) => (
+                {companies && companies.map((company: DictionaryItem) => (
                   <option key={company.code} value={company.code}>
                     {company.description}
                   </option>
@@ -233,6 +208,11 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
                 </div>
               )}
             </div>
+            {companiesError && (
+              <p className="text-xs text-red-600 mt-1">
+                Could not load companies. Please try again later.
+              </p>
+            )}
           </div>
 
           {/* Branch Dropdown (Dependent on Company) */}
@@ -249,10 +229,10 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
                 required
               >
                 <option value="">
-                  {!formData.company 
-                    ? "Select Company first" 
-                    : loadingBranches 
-                    ? "Loading branches..." 
+                  {!formData.company
+                    ? "Select Company first"
+                    : loadingBranches
+                    ? "Loading branches..."
                     : "Select Branch"
                   }
                 </option>

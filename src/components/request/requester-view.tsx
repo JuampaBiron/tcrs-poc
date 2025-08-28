@@ -1,4 +1,4 @@
-// src/components/request/requester-view.tsx - ENHANCED VERSION
+// src/components/request/requester-view.tsx 
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,7 +29,7 @@ interface InvoiceData {
   pdfUrl?: string;
   pdfOriginalName?: string;
   pdfTempId?: string;
-  blobName?: string; // ✅ Direct blob name for Azure operations
+  blobName?: string; 
 }
 
 interface GLCodingEntry {

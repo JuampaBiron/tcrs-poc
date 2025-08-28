@@ -95,6 +95,19 @@ class ApiClient {
         }
       }
     }
+  async getCompanies() {
+    const res = await fetch('/api/dictionaries/companies');
+    if (!res.ok) throw new Error('Failed to fetch companies');
+    const data = await res.json();
+    return data.data.companies;
+    }
+
+  async getBranches(companyErp: string) {
+    const res = await fetch(`/api/dictionaries/branches?erp=${encodeURIComponent(companyErp)}`);
+    if (!res.ok) throw new Error('Failed to fetch branches');
+    const data = await res.json();
+    return data.data.branches;
+  }
 
   // Search API
   async searchRequests(params: {
