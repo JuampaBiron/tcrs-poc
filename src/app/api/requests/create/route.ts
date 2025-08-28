@@ -1,7 +1,8 @@
-// src/app/api/requests/create/route.ts - FINAL FIXED VERSION
+// src/app/api/requests/create/route.ts - ENHANCED WITH WORKFLOW TRACKING
 import { NextRequest, NextResponse } from 'next/server';
 import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { renamePdfWithRequestId } from '@/lib/azure-pdf-rename';
+import { trackRequestCreated } from '@/lib/workflow-tracker'; // ✅ NEW IMPORT
 import { 
   db, 
   approvalRequests, 
@@ -38,42 +39,37 @@ export async function POST(request: NextRequest) {
     // Step 2: If PDF was uploaded, rename it with real requestId
     if (invoiceDataParsed.pdfUrl && invoiceDataParsed.pdfTempId) {
       try {
-        console.log('🔄 Renaming PDF with request ID...');
-        
-        // ✅ FIX: Use blobName directly if available (from improved upload), 
-        // otherwise extract from URL
-        let tempBlobName;
-        if (invoiceDataParsed.blobName) {
-          // Use direct blob name (preferred - no URL parsing needed)
-          tempBlobName = invoiceDataParsed.blobName;
-          console.log(`🔍 Using direct blob name: ${tempBlobName}`);
-        } else {
-          // Fallback: extract from URL and decode
-          const url = new URL(invoiceDataParsed.pdfUrl);
-          const urlPath = url.pathname.substring(url.pathname.indexOf('invoices/'));
-          tempBlobName = decodeURIComponent(urlPath);
-          console.log(`🔍 Extracted from URL: ${urlPath} → ${tempBlobName}`);
-        }
-        
-        // Rename PDF with real request ID
-        const newPdfUrl = await renamePdfWithRequestId(
-          tempBlobName,
+        console.log('🔄 Renaming PDF with real requestId...');
+        const renamedPdfUrl = await renamePdfWithRequestId(
+          invoiceDataParsed.pdfTempId,
           requestId,
-          invoiceDataParsed.pdfOriginalName
+          invoiceDataParsed.blobName || `${requestId}.pdf`
         );
         
-        // Update request with new PDF URL
-        await updateRequestPdfUrl(requestId, newPdfUrl);
+        // Step 3: Update database with final PDF URL
+        await updateRequestPdfUrl(requestId, renamedPdfUrl);
         
-        console.log(`✅ PDF renamed and associated with request ${requestId}`);
+        console.log('✅ PDF renamed and URL updated successfully');
+        
+        return createSuccessResponse({
+          requestId,
+          message: 'Request created successfully with PDF',
+          pdfUrl: renamedPdfUrl
+        });
         
       } catch (pdfError) {
-        console.error('❌ Failed to rename PDF:', pdfError);
-        // Request is still created, but PDF might have old name
-        // Could implement retry logic or manual fix later
+        console.error('❌ PDF rename failed, but request was created:', pdfError);
+        
+        // Request was created but PDF rename failed - still success
+        return createSuccessResponse({
+          requestId,
+          message: 'Request created successfully, but PDF processing had issues',
+          warning: 'PDF file may not be properly linked'
+        });
       }
     }
     
+    // No PDF case - just return success
     return createSuccessResponse({
       requestId,
       message: 'Request created successfully'
@@ -85,7 +81,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ ENHANCED IMPLEMENTATION - NOW INCLUDES GL-CODING DATA
+// ✅ ENHANCED IMPLEMENTATION - NOW INCLUDES GL-CODING DATA + WORKFLOW TRACKING
 async function createRequestInDatabase(data: {
   invoiceData: any;
   glCodingData: any[];
@@ -136,7 +132,11 @@ async function createRequestInDatabase(data: {
       });
       console.log('✅ ApprovalRequest created');
       
-      // 2. Insert into InvoiceData table
+      // 🔥 2. Track workflow step - REQUEST CREATED
+      await trackRequestCreated(tx, requestId, requester);
+      console.log('✅ Workflow step tracked: request_created');
+      
+      // 3. Insert into InvoiceData table
       await tx.insert(invoiceData).values({
         invoiceId: createId(),
         requestId,
@@ -154,7 +154,7 @@ async function createRequestInDatabase(data: {
       });
       console.log('✅ InvoiceData created');
 
-      // 3. Create GLCodingUploadedData record
+      // 4. Create GLCodingUploadedData record
       const uploadId = createId();
       await tx.insert(glCodingUploadedData).values({
         uploadId,
@@ -168,7 +168,7 @@ async function createRequestInDatabase(data: {
       });
       console.log('✅ GLCodingUploadedData created');
 
-      // 4. Insert GL-Coding entries
+      // 5. Insert GL-Coding entries
       const glEntries = glCodingEntries.map((entry: any) => ({
         uploadId,
         accountCode: entry.accountCode,
