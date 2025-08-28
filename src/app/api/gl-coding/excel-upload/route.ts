@@ -1,6 +1,49 @@
-// src/app/api/gl-coding/excel-upload/route.ts
+// src/app/api/gl-coding/excel-upload/route.ts - MODIFIED VERSION
 import { NextRequest, NextResponse } from 'next/server';
+import { BlobServiceClient } from '@azure/storage-blob';
 import ExcelJS from 'exceljs';
+
+// Azure Blob Storage client (reutilizando la lógica del PDF)
+const getBlobServiceClient = () => {
+  const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+  const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
+  
+  if (!accountName || !accountKey) {
+    throw new Error('Azure Storage credentials not configured');
+  }
+  
+  const connectionString = `DefaultEndpointsProtocol=https;AccountName=${accountName};AccountKey=${accountKey};EndpointSuffix=core.windows.net`;
+  return {
+    client: BlobServiceClient.fromConnectionString(connectionString),
+    containerName
+  };
+};
+
+/**
+ * Generate blob-friendly timestamp without special characters
+ */
+function generateBlobFriendlyTimestamp(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hour = String(now.getHours()).padStart(2, '0');
+  const minute = String(now.getMinutes()).padStart(2, '0');
+  const second = String(now.getSeconds()).padStart(2, '0');
+  const millisecond = String(now.getMilliseconds()).padStart(3, '0');
+  
+  // Format: YYYYMMDD-HHMMSS-mmm (blob-friendly, no special chars)
+  return `${year}${month}${day}-${hour}${minute}${second}-${millisecond}`;
+}
+
+/**
+ * Sanitize filename to be blob-friendly
+ */
+function sanitizeFileName(fileName: string): string {
+  // Replace problematic characters with underscores
+  return fileName.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+}
 
 function parseExcelAmount(value: any): number {
   if (typeof value === 'number') return value;
@@ -30,7 +73,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only Excel files (.xlsx, .xls) are allowed' }, { status: 400 });
     }
 
-    // Process Excel file
+    // Process Excel file first
     const arrayBuffer = await file.arrayBuffer();
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(arrayBuffer);
@@ -40,7 +83,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Excel file contains no worksheets' }, { status: 400 });
     }
 
-    // Process rows (9 column format)
+    // Process rows (9 column format) - EXISTING LOGIC
     const entries: any[] = [];
     const validationErrors: string[] = [];
 
@@ -88,6 +131,64 @@ export async function POST(request: NextRequest) {
 
     console.log(`📊 Processed ${entries.length} entries from Excel`);
 
+    // ✅ NEW: Upload Excel file to blob storage if processing was successful
+    let tempBlobUrl = null;
+    let blobName = null;
+    
+    if (entries.length > 0) {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const timestamp = generateBlobFriendlyTimestamp();
+        const randomId = Math.random().toString(36).substr(2, 9);
+        const sanitizedFileName = sanitizeFileName(file.name);
+        
+        // ✅ Blob name for GL Coding Excel files: gl-coding-xlsx/gl-coding/${year}/${month}/TEMP-*
+        blobName = `gl-coding-xlsx/gl-coding/${year}/${month}/TEMP-${timestamp}_${sanitizedFileName}`;
+        
+        console.log(`📤 Uploading Excel to blob: ${blobName}`);
+        
+        // Upload to Azure Blob Storage
+        const { client: blobServiceClient, containerName } = getBlobServiceClient();
+        const containerClient = blobServiceClient.getContainerClient(containerName);
+        
+        await containerClient.createIfNotExists();
+        
+        const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+        
+        // Use the same arrayBuffer we already have
+        const buffer = Buffer.from(arrayBuffer);
+        
+        await blockBlobClient.uploadData(buffer, {
+          blobHTTPHeaders: {
+            blobContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            blobContentDisposition: `attachment; filename="${file.name}"`,
+          },
+          metadata: {
+            context: 'gl-coding-excel',
+            originalFileName: file.name,
+            uploadedAt: now.toISOString(),
+            tempId: `${timestamp}_${randomId}`,
+            status: 'temporary', // For cleanup
+            year: year.toString(),
+            month: month,
+            entriesCount: entries.length.toString(),
+            totalAmount: entries.reduce((sum, entry) => sum + entry.amount, 0).toString()
+          },
+        });
+        
+        tempBlobUrl = blockBlobClient.url;
+        
+        console.log(`✅ Excel uploaded to blob successfully: ${tempBlobUrl}`);
+        
+      } catch (blobError) {
+        console.error('⚠️ Error uploading Excel to blob storage:', blobError);
+        // Don't fail the entire request if blob upload fails, just log it
+        // The processing results are still valid
+      }
+    }
+
     return NextResponse.json({
       success: true,
       preview: entries,
@@ -95,7 +196,10 @@ export async function POST(request: NextRequest) {
       totalEntries: entries.length,
       totalAmount: entries.reduce((sum, entry) => sum + entry.amount, 0),
       fileName: file.name,
-      fileSize: file.size
+      fileSize: file.size,
+      // ✅ NEW: Include blob storage information
+      tempBlobUrl, // URL of the uploaded Excel file (null if upload failed)
+      blobName,    // Blob name for future reference (null if upload failed)
     });
 
   } catch (error) {

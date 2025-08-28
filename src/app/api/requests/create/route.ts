@@ -1,8 +1,9 @@
-// src/app/api/requests/create/route.ts - ENHANCED WITH WORKFLOW TRACKING
+// src/app/api/requests/create/route.ts - ENHANCED WITH EXCEL BLOB RENAME
 import { NextRequest, NextResponse } from 'next/server';
 import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { renamePdfWithRequestId } from '@/lib/azure-pdf-rename';
-import { trackRequestCreated } from '@/lib/workflow-tracker'; // ✅ NEW IMPORT
+import { renameExcelWithRequestId } from '@/lib/azure-excel-rename'; // ✅ NEW IMPORT
+import { trackRequestCreated } from '@/lib/workflow-tracker';
 import { 
   db, 
   approvalRequests, 
@@ -36,44 +37,90 @@ export async function POST(request: NextRequest) {
     
     console.log(`✅ Request created with ID: ${requestId}`);
     
-    // Step 2: If PDF was uploaded, rename it with real requestId
+    // Step 2: Rename files with real requestId
+    let renamedPdfUrl = null;
+    let renamedExcelUrl = null;
+    let filesProcessed = { pdf: false, excel: false };
+    
+    // ✅ Step 2a: Rename PDF if uploaded
     if (invoiceDataParsed.pdfUrl && invoiceDataParsed.pdfTempId) {
       try {
         console.log('🔄 Renaming PDF with real requestId...');
-        const renamedPdfUrl = await renamePdfWithRequestId(
+        renamedPdfUrl = await renamePdfWithRequestId(
           invoiceDataParsed.pdfTempId,
           requestId,
           invoiceDataParsed.blobName || `${requestId}.pdf`
         );
         
-        // Step 3: Update database with final PDF URL
+        // Update database with final PDF URL
         await updateRequestPdfUrl(requestId, renamedPdfUrl);
+        filesProcessed.pdf = true;
         
         console.log('✅ PDF renamed and URL updated successfully');
         
-        return createSuccessResponse({
-          requestId,
-          message: 'Request created successfully with PDF',
-          pdfUrl: renamedPdfUrl
-        });
-        
       } catch (pdfError) {
-        console.error('❌ PDF rename failed, but request was created:', pdfError);
-        
-        // Request was created but PDF rename failed - still success
-        return createSuccessResponse({
-          requestId,
-          message: 'Request created successfully, but PDF processing had issues',
-          warning: 'PDF file may not be properly linked'
-        });
+        console.error('❌ PDF rename failed:', pdfError);
+        // Continue processing, PDF error won't fail the request
       }
     }
     
-    // No PDF case - just return success
-    return createSuccessResponse({
+    // ✅ Step 2b: NEW - Rename Excel if uploaded
+    const excelInfo = await getExcelInfoFromDatabase(requestId);
+    if (excelInfo && excelInfo.tempBlobUrl) {
+      try {
+        console.log('🔄 Renaming Excel with real requestId...');
+        console.log(`📎 Excel temp URL: ${excelInfo.tempBlobUrl}`);
+        
+        // Extract blob name from URL
+        const tempBlobName = extractBlobNameFromUrl(excelInfo.tempBlobUrl);
+        
+        renamedExcelUrl = await renameExcelWithRequestId(
+          tempBlobName,
+          requestId,
+          excelInfo.originalFileName || `${requestId}.xlsx`
+        );
+        
+        // Update database with final Excel URL
+        await updateRequestExcelUrl(requestId, renamedExcelUrl);
+        filesProcessed.excel = true;
+        
+        console.log('✅ Excel renamed and URL updated successfully');
+        
+      } catch (excelError) {
+        console.error('❌ Excel rename failed:', excelError);
+        // Continue processing, Excel error won't fail the request
+      }
+    }
+    
+    // Step 3: Prepare response based on files processed
+    const response: any = {
       requestId,
-      message: 'Request created successfully'
-    });
+      message: 'Request created successfully',
+      filesProcessed
+    };
+    
+    if (renamedPdfUrl) {
+      response.pdfUrl = renamedPdfUrl;
+    }
+    
+    if (renamedExcelUrl) {
+      response.excelUrl = renamedExcelUrl;
+    }
+    
+    // Add warnings if any files failed to process
+    const warnings = [];
+    if (invoiceDataParsed.pdfUrl && !filesProcessed.pdf) {
+      warnings.push('PDF file may not be properly linked');
+    }
+    if (excelInfo?.tempBlobUrl && !filesProcessed.excel) {
+      warnings.push('Excel file may not be properly linked');
+    }
+    
+    if (warnings.length > 0) {
+      response.warnings = warnings;
+    }
+    
+    return createSuccessResponse(response);
     
   } catch (error) {
     console.error('❌ Request creation failed:', error);
@@ -81,7 +128,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ✅ ENHANCED IMPLEMENTATION - NOW INCLUDES GL-CODING DATA + WORKFLOW TRACKING
+// ✅ ENHANCED: Create request in database (existing function)
 async function createRequestInDatabase(data: {
   invoiceData: any;
   glCodingData: any[];
@@ -132,7 +179,7 @@ async function createRequestInDatabase(data: {
       });
       console.log('✅ ApprovalRequest created');
       
-      // 🔥 2. Track workflow step - REQUEST CREATED
+      // 2. Track workflow step - REQUEST CREATED
       await trackRequestCreated(tx, requestId, requester);
       console.log('✅ Workflow step tracked: request_created');
       
@@ -160,9 +207,9 @@ async function createRequestInDatabase(data: {
         uploadId,
         requestId,
         uploader: requester,
-        uploadedFile: false, // False for manual form entry
+        uploadedFile: false, // Will be updated if there's an Excel file
         status: 'completed',
-        blobUrl: null, // No file for manual entry
+        blobUrl: null, // Will be updated if there's an Excel file
         createdDate: new Date(),
         modifiedDate: null,
       });
@@ -194,6 +241,7 @@ async function createRequestInDatabase(data: {
   }
 }
 
+// ✅ EXISTING: Update PDF URL function
 async function updateRequestPdfUrl(requestId: string, pdfUrl: string): Promise<void> {
   try {
     // Update invoice_data table with the final PDF URL
@@ -209,5 +257,79 @@ async function updateRequestPdfUrl(requestId: string, pdfUrl: string): Promise<v
   } catch (error) {
     console.error('❌ Failed to update PDF URL:', error);
     throw new Error(`Failed to update PDF URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// ✅ NEW: Get Excel info from database
+async function getExcelInfoFromDatabase(requestId: string): Promise<{
+  tempBlobUrl: string | null;
+  originalFileName: string | null;
+  uploadId: string;
+} | null> {
+  try {
+    const result = await db
+      .select({
+        blobUrl: glCodingUploadedData.blobUrl,
+        uploadId: glCodingUploadedData.uploadId
+      })
+      .from(glCodingUploadedData)
+      .where(eq(glCodingUploadedData.requestId, requestId))
+      .limit(1);
+      
+    if (result.length === 0 || !result[0].blobUrl) {
+      return null;
+    }
+    
+    // Extract original filename from blob URL or use default
+    const blobUrl = result[0].blobUrl;
+    const urlParts = blobUrl.split('/');
+    const fileName = urlParts[urlParts.length - 1];
+    // Remove TEMP- prefix to get original name
+    const originalFileName = fileName.replace(/^TEMP-[^_]+_/, '');
+    
+    return {
+      tempBlobUrl: blobUrl,
+      originalFileName,
+      uploadId: result[0].uploadId
+    };
+    
+  } catch (error) {
+    console.error('❌ Failed to get Excel info from database:', error);
+    return null;
+  }
+}
+
+// ✅ NEW: Update Excel URL in database
+async function updateRequestExcelUrl(requestId: string, excelUrl: string): Promise<void> {
+  try {
+    // Update gl_coding_uploaded_data table with the final Excel URL
+    await db
+      .update(glCodingUploadedData)
+      .set({ 
+        blobUrl: excelUrl,
+        uploadedFile: true, // Mark as having uploaded file
+        modifiedDate: new Date()
+      })
+      .where(eq(glCodingUploadedData.requestId, requestId));
+      
+    console.log(`✅ Excel URL updated for request: ${requestId}`);
+  } catch (error) {
+    console.error('❌ Failed to update Excel URL:', error);
+    throw new Error(`Failed to update Excel URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+// ✅ NEW: Helper function to extract blob name from URL
+function extractBlobNameFromUrl(blobUrl: string): string {
+  try {
+    const url = new URL(blobUrl);
+    // Remove the leading slash and container name
+    const pathParts = url.pathname.split('/');
+    // Skip empty first element and container name, return the rest
+    return pathParts.slice(2).join('/');
+  } catch (error) {
+    console.error('Error extracting blob name from URL:', error);
+    // Fallback: return the URL as-is if parsing fails
+    return blobUrl;
   }
 }
