@@ -1,15 +1,15 @@
-// src/components/request/gl-coding-form.tsx
+// src/components/request/gl-coding-form.tsx - ENHANCED WITH ENTRY VALIDATION
 "use client";
 
-import { useState, useEffect } from "react";
-import { AlertCircle, Check } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { AlertCircle, Check, XCircle, AlertTriangle } from "lucide-react";
 import GLCodingTable from "./gl-coding-table";
 import ExcelUploadModal from "./excel-upload-modal";
 import QuickActions from "./quick-actions";
 import ErrorMessage from "@/components/ui/error-message";
 
 interface GLCodingEntry {
-  id?: string; // Agregar id opcional para tracking
+  id?: string;
   accountCode: string;
   facilityCode: string;
   taxCode: string;
@@ -31,6 +31,33 @@ interface GLCodingFormProps {
   initialData?: GLCodingEntry[];
 }
 
+// ✅ Entry validation function
+function validateGLEntry(entry: GLCodingEntry, index: number): string[] {
+  const errors: string[] = [];
+  const entryNum = index + 1;
+
+  // Account code validation
+  if (!entry.accountCode || entry.accountCode.trim().length === 0) {
+    errors.push(`Entry ${entryNum}: Account code is required`);
+  }
+
+  // Facility code validation
+  if (!entry.facilityCode || entry.facilityCode.trim().length === 0) {
+    errors.push(`Entry ${entryNum}: Facility code is required`);
+  }
+
+  // Amount validation
+  if (entry.amount === null || entry.amount === undefined) {
+    errors.push(`Entry ${entryNum}: Amount cannot be empty`);
+  } else if (typeof entry.amount !== 'number' || isNaN(entry.amount)) {
+    errors.push(`Entry ${entryNum}: Amount must be a valid number`);
+  } else if (entry.amount <= 0) {
+    errors.push(`Entry ${entryNum}: Amount must be greater than zero`);
+  }
+
+  return errors;
+}
+
 export default function GLCodingFormImproved({ 
   invoiceAmount, 
   onSubmit, 
@@ -49,9 +76,7 @@ export default function GLCodingFormImproved({
     }]
   );
 
-  // Estado para filas seleccionadas
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-
   const [inputMode, setInputMode] = useState<'table' | 'excel'>('table');
   const [dictionaries, setDictionaries] = useState<Dictionaries>({
     accounts: [],
@@ -62,10 +87,34 @@ export default function GLCodingFormImproved({
   const [error, setError] = useState<string | null>(null);
   const [showExcelModal, setShowExcelModal] = useState(false);
 
-  // Calculate amounts
-  const totalAmount = entries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
-  const remainingAmount = invoiceAmount - totalAmount;
-  const amountsMatch = Math.abs(remainingAmount) < 0.01;
+  // ✅ Comprehensive validation with memoization for performance
+  const validationResults = useMemo(() => {
+    const allErrors: string[] = [];
+    const entryValidations: { [index: number]: string[] } = {};
+    
+    entries.forEach((entry, index) => {
+      const entryErrors = validateGLEntry(entry, index);
+      entryValidations[index] = entryErrors;
+      allErrors.push(...entryErrors);
+    });
+
+    const totalAmount = entries.reduce((sum, entry) => sum + (entry.amount || 0), 0);
+    const remainingAmount = invoiceAmount - totalAmount;
+    const amountsMatch = Math.abs(remainingAmount) < 0.01;
+    const validEntries = entries.filter((_, index) => entryValidations[index].length === 0);
+
+    return {
+      allErrors,
+      entryValidations,
+      totalAmount,
+      remainingAmount,
+      amountsMatch,
+      validEntries: validEntries.length,
+      invalidEntries: entries.length - validEntries.length,
+      hasValidationErrors: allErrors.length > 0,
+      canSubmit: allErrors.length === 0 && amountsMatch
+    };
+  }, [entries, invoiceAmount]);
 
   // Load dictionaries on component mount
   useEffect(() => {
@@ -86,8 +135,16 @@ export default function GLCodingFormImproved({
   };
 
   const handleSubmit = async () => {
-    if (!amountsMatch) {
-      setError('Total amounts must match invoice amount before submitting');
+    console.log('🔍 GL Coding Form submission attempt...');
+    console.log('📋 Validation results:', validationResults);
+    
+    // ✅ Prevent submission if there are validation errors
+    if (!validationResults.canSubmit) {
+      if (validationResults.hasValidationErrors) {
+        setError(`Please fix ${validationResults.allErrors.length} validation error(s) before continuing`);
+      } else if (!validationResults.amountsMatch) {
+        setError('Total amounts must match invoice amount before continuing');
+      }
       return;
     }
 
@@ -95,7 +152,9 @@ export default function GLCodingFormImproved({
     setError(null);
 
     try {
-      // Validate entries one more time
+      console.log('✅ All validations passed, submitting data...');
+      
+      // ✅ Final server-side validation (optional double-check)
       const validationResponse = await fetch('/api/gl-coding/validate-amounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,10 +169,13 @@ export default function GLCodingFormImproved({
         return;
       }
 
+      console.log('✅ Server validation passed, calling onSubmit...');
+      
       // Submit to parent component
       onSubmit(entries);
       
     } catch (err) {
+      console.error('❌ GL Coding submission failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit GL coding data');
     } finally {
       setLoading(false);
@@ -121,22 +183,19 @@ export default function GLCodingFormImproved({
   };
 
   const handleExcelImport = (importedEntries: GLCodingEntry[]) => {
-    // Asegurar que las entradas importadas tengan IDs únicos
     const entriesWithIds = importedEntries.map((entry, index) => ({
       ...entry,
       id: entry.id || `gl-import-${Date.now()}-${index}`
     }));
     
     setEntries(entriesWithIds);
-    setSelectedRows(new Set()); // Limpiar selección
+    setSelectedRows(new Set());
     setShowExcelModal(false);
     setInputMode('table');
     setError(null);
   };
 
-  // Handler para cambios en las entradas que también limpia selecciones inválidas
   const handleEntriesChange = (newEntries: GLCodingEntry[]) => {
-    // Asegurar que siempre hay al menos una entrada
     const finalEntries = newEntries.length === 0 
       ? [{
           id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -151,7 +210,7 @@ export default function GLCodingFormImproved({
       
     setEntries(finalEntries);
     
-    // Limpiar selecciones que ya no son válidas
+    // Clean up invalid selections
     const maxIndex = finalEntries.length - 1;
     const validSelections = new Set(
       Array.from(selectedRows).filter(index => index <= maxIndex)
@@ -164,21 +223,97 @@ export default function GLCodingFormImproved({
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6 max-w-7xl mx-auto">
-      {/* Header with Amount Summary */}
-      <div className="flex justify-between items-center mb-6">
+      {/* Header with Enhanced Amount Summary */}
+      <div className="flex justify-between items-start mb-6">
         <h3 className="text-lg font-semibold text-gray-900">GL Coding Block</h3>
-        <div className="text-right">
+        <div className="text-right space-y-1">
           <div className="text-sm text-gray-600">
             Invoice Amount: <span className="font-medium">${invoiceAmount.toLocaleString()}</span>
           </div>
           <div className={`text-sm font-medium ${
-            amountsMatch ? 'text-green-600' : 
-            remainingAmount > 0 ? 'text-yellow-600' : 'text-red-600'
+            validationResults.amountsMatch ? 'text-green-600' : 
+            validationResults.remainingAmount > 0 ? 'text-yellow-600' : 'text-red-600'
           }`}>
-            Total: ${totalAmount.toLocaleString()} 
-            {!amountsMatch && ` (${remainingAmount > 0 ? '+' : ''}${remainingAmount.toLocaleString()})`}
+            Total: ${validationResults.totalAmount.toLocaleString()} 
+            {!validationResults.amountsMatch && (
+              <span className="ml-1">
+                ({validationResults.remainingAmount > 0 ? '+' : ''}${validationResults.remainingAmount.toLocaleString()})
+              </span>
+            )}
+          </div>
+          <div className="text-xs text-gray-500">
+            Progress: {Math.min(100, (validationResults.totalAmount / invoiceAmount) * 100).toFixed(1)}%
           </div>
         </div>
+      </div>
+
+      {/* ✅ NEW: Validation Status Summary */}
+      <div className="mb-6 p-4 rounded-lg border bg-gray-50">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="font-medium text-gray-900 flex items-center">
+            <AlertCircle className="w-4 h-4 mr-2" />
+            Entry Status
+          </h4>
+          <div className="flex items-center space-x-4 text-sm">
+            <div className={`flex items-center ${validationResults.validEntries > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+              <Check className="w-4 h-4 mr-1" />
+              {validationResults.validEntries} valid
+            </div>
+            <div className={`flex items-center ${validationResults.invalidEntries > 0 ? 'text-red-600' : 'text-gray-400'}`}>
+              <XCircle className="w-4 h-4 mr-1" />
+              {validationResults.invalidEntries} invalid
+            </div>
+            <div className={`flex items-center ${validationResults.amountsMatch ? 'text-green-600' : 'text-yellow-600'}`}>
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              {validationResults.amountsMatch ? 'Amounts match' : 'Amounts mismatch'}
+            </div>
+          </div>
+        </div>
+        
+        {/* ✅ Error List */}
+        {validationResults.hasValidationErrors && (
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-red-700">
+              {validationResults.allErrors.length} error(s) found:
+            </p>
+            <div className="max-h-32 overflow-y-auto">
+              {validationResults.allErrors.slice(0, 10).map((errorMsg, index) => (
+                <div key={index} className="text-sm text-red-600 pl-4">
+                  • {errorMsg}
+                </div>
+              ))}
+              {validationResults.allErrors.length > 10 && (
+                <div className="text-sm text-red-600 pl-4 font-medium">
+                  ... and {validationResults.allErrors.length - 10} more error(s)
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+        
+        {/* ✅ Amount Status */}
+        {!validationResults.amountsMatch && !validationResults.hasValidationErrors && (
+          <div className="text-sm">
+            <p className="text-yellow-700 font-medium">
+              Amount adjustment needed:
+            </p>
+            <p className="text-yellow-600">
+              {validationResults.remainingAmount > 0 
+                ? `Add $${validationResults.remainingAmount.toLocaleString()} more`
+                : `Remove $${Math.abs(validationResults.remainingAmount).toLocaleString()}`}
+            </p>
+          </div>
+        )}
+        
+        {/* ✅ Ready to submit */}
+        {validationResults.canSubmit && (
+          <div className="text-sm">
+            <p className="text-green-700 font-medium flex items-center">
+              <Check className="w-4 h-4 mr-1" />
+              Ready to continue - all validations passed!
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Input Mode Toggle */}
@@ -200,65 +335,59 @@ export default function GLCodingFormImproved({
           }}
           className={`px-4 py-2 text-sm font-medium rounded-md ${
             inputMode === 'excel' 
-              ? 'bg-blue-100 text-blue-700 border border-blue-300' 
+              ? 'bg-blue-100 text-blue-700 border border-blue-300'
               : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
           }`}
         >
-          Load Excel
+          Import from Excel
         </button>
       </div>
 
-      {/* Quick Actions */}
-      <QuickActions
-        entries={entries}
-        onEntriesChange={handleEntriesChange}
-        remainingAmount={remainingAmount}
-        onError={setError}
-        selectedRows={selectedRows}
-        onSelectedRowsChange={setSelectedRows}
-      />
+      {/* Main Content Area */}
+      <div className="space-y-6">
+        {/* GL Coding Table */}
+        <GLCodingTable 
+          entries={entries} 
+          onEntriesChange={handleEntriesChange}
+          dictionaries={dictionaries}
+          onError={setError}
+          selectedRows={selectedRows}
+          onSelectedRowsChange={setSelectedRows}
+        />
 
-      {/* Main Table */}
-      <GLCodingTable
-        entries={entries}
-        onEntriesChange={handleEntriesChange}
-        dictionaries={dictionaries}
-        onError={setError}
-        selectedRows={selectedRows}
-        onSelectedRowsChange={setSelectedRows}
-      />
+        {/* Quick Actions */}
+        <QuickActions 
+          entries={entries}
+          onEntriesChange={handleEntriesChange}
+          remainingAmount={validationResults.remainingAmount}
+          onError={setError}
+          selectedRows={selectedRows}
+          onSelectedRowsChange={setSelectedRows}
+        />
 
-      {/* Status Summary */}
-      <div className={`mt-6 p-4 rounded-lg border ${
-        amountsMatch ? 'bg-green-50 border-green-200' : 
-        remainingAmount > 0 ? 'bg-yellow-50 border-yellow-200' : 
-        'bg-red-50 border-red-200'
-      }`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            {amountsMatch ? (
-              <Check className="w-5 h-5 text-green-600 mr-2" />
-            ) : (
-              <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
-            )}
+        {/* Enhanced Progress Summary */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex justify-between items-center">
             <div>
               <p className={`font-medium ${
-                amountsMatch ? 'text-green-800' : 
-                remainingAmount > 0 ? 'text-yellow-800' : 'text-red-800'
+                validationResults.amountsMatch ? 'text-green-800' : 
+                validationResults.remainingAmount > 0 ? 'text-yellow-800' : 'text-red-800'
               }`}>
-                {entries.length} entries - Total: ${totalAmount.toLocaleString()}
+                {entries.length} entries - Total: ${validationResults.totalAmount.toLocaleString()}
               </p>
               <p className={`text-sm ${
-                amountsMatch ? 'text-green-600' : 
-                remainingAmount > 0 ? 'text-yellow-600' : 'text-red-600'
+                validationResults.amountsMatch ? 'text-green-600' : 
+                validationResults.remainingAmount > 0 ? 'text-yellow-600' : 'text-red-600'
               }`}>
-                {amountsMatch ? 'Amounts match!' : `Difference: $${remainingAmount.toLocaleString()}`}
+                {validationResults.amountsMatch 
+                  ? 'Amounts match perfectly!' 
+                  : `Difference: $${validationResults.remainingAmount.toLocaleString()}`}
               </p>
             </div>
-          </div>
-          <div className="text-right text-sm text-gray-600">
-            <div>Invoice: ${invoiceAmount.toLocaleString()}</div>
-            <div>Progress: {Math.min(100, (totalAmount / invoiceAmount) * 100).toFixed(1)}%</div>
+            <div className="text-right text-sm text-gray-600">
+              <div>Invoice: ${invoiceAmount.toLocaleString()}</div>
+              <div>Progress: {Math.min(100, (validationResults.totalAmount / invoiceAmount) * 100).toFixed(1)}%</div>
+            </div>
           </div>
         </div>
       </div>
@@ -266,26 +395,53 @@ export default function GLCodingFormImproved({
       {/* Error Display */}
       {error && <ErrorMessage message={error} />}
 
-      {/* Action Buttons */}
+      {/* ✅ Enhanced Action Buttons */}
       <div className="flex justify-between pt-6 border-t border-gray-200 mt-6">
         <button 
           onClick={onBack}
-          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
         >
           Back to Invoice
         </button>
         
-        <button
-          onClick={handleSubmit}
-          disabled={!amountsMatch || loading}
-          className={`px-6 py-2 text-sm font-medium text-white rounded-md ${
-            amountsMatch && !loading
-              ? 'bg-blue-600 hover:bg-blue-700' 
-              : 'bg-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {loading ? 'Saving...' : 'Continue to Review'}
-        </button>
+        <div className="flex items-center space-x-3">
+          {/* ✅ Status indicator next to button */}
+          {validationResults.hasValidationErrors && (
+            <div className="flex items-center text-sm text-red-600">
+              <XCircle className="w-4 h-4 mr-1" />
+              {validationResults.allErrors.length} error{validationResults.allErrors.length !== 1 ? 's' : ''}
+            </div>
+          )}
+          
+          {!validationResults.hasValidationErrors && !validationResults.amountsMatch && (
+            <div className="flex items-center text-sm text-yellow-600">
+              <AlertTriangle className="w-4 h-4 mr-1" />
+              Amounts don't match
+            </div>
+          )}
+          
+          {validationResults.canSubmit && (
+            <div className="flex items-center text-sm text-green-600">
+              <Check className="w-4 h-4 mr-1" />
+              Ready
+            </div>
+          )}
+          
+          <button
+            onClick={handleSubmit}
+            disabled={!validationResults.canSubmit || loading}
+            className={`px-6 py-2 text-sm font-medium rounded-md transition-colors ${
+              validationResults.canSubmit && !loading
+                ? 'bg-blue-600 hover:bg-blue-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+          >
+            {loading ? 'Validating...' : 
+             validationResults.hasValidationErrors ? `Fix ${validationResults.allErrors.length} error${validationResults.allErrors.length !== 1 ? 's' : ''} to continue` :
+             !validationResults.amountsMatch ? 'Adjust amounts to continue' :
+             'Continue to Review'}
+          </button>
+        </div>
       </div>
 
       {/* Excel Upload Modal */}

@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
       try {
         console.log('🔄 Renaming PDF with real requestId...');
         renamedPdfUrl = await renamePdfWithRequestId(
-          invoiceDataParsed.pdfTempId,
+          invoiceDataParsed.blobName,   // ← SOLUCIÓN: El blobName completo
           requestId,
-          invoiceDataParsed.blobName || `${requestId}.pdf`
+          invoiceDataParsed.pdfOriginalName || `${requestId}.pdf`
         );
         
         // Update database with final PDF URL

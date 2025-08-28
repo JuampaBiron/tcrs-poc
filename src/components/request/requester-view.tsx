@@ -1,4 +1,4 @@
-// src/components/request/requester-view.tsx
+// src/components/request/requester-view.tsx - ENHANCED VERSION
 "use client";
 
 import { useState, useEffect } from "react";
@@ -29,7 +29,7 @@ interface InvoiceData {
   pdfUrl?: string;
   pdfOriginalName?: string;
   pdfTempId?: string;
-  blobName?: string; // ✅ NEW: Direct blob name for Azure operations
+  blobName?: string; // ✅ Direct blob name for Azure operations
 }
 
 interface GLCodingEntry {
@@ -63,12 +63,14 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   const amountsMatch = Math.abs(invoiceTotal - glCodingTotal) < 0.01;
 
   const handleInvoiceSubmit = (data: InvoiceData) => {
+    console.log('📝 Invoice form submitted:', data);
     setInvoiceData(data);
     setCurrentStep('gl-coding');
     setError(null);
   };
 
   const handleGLCodingSubmit = (data: GLCodingEntry[]) => {
+    console.log('📝 GL Coding form submitted:', data);
     setGLCodingData(data);
     setCurrentStep('validation');
     setError(null);
@@ -80,6 +82,10 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       return;
     }
 
+    console.log('🚀 Starting final request submission process...');
+    console.log('📋 Invoice data:', invoiceData);
+    console.log('📋 GL Coding data:', glCodingData);
+
     setLoading(true);
     setError(null);
 
@@ -88,54 +94,157 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       
       // Step 1: Upload PDF if present
       if (invoiceData.pdfFile) {
-        console.log('🔄 Uploading PDF before creating request...');
+        console.log('🔄 Step 1: Uploading PDF before creating request...');
+        console.log(`📎 PDF File details:`);
+        console.log(`   └── Name: "${invoiceData.pdfFile.name}"`);
+        console.log(`   └── Size: ${invoiceData.pdfFile.size} bytes (${(invoiceData.pdfFile.size / 1024 / 1024).toFixed(2)} MB)`);
+        console.log(`   └── Type: "${invoiceData.pdfFile.type}"`);
+        
         try {
-          // No need for requestId - use direct naming
           pdfUploadResult = await uploadPdf(invoiceData.pdfFile, 'direct');
-          console.log('✅ PDF uploaded successfully:', pdfUploadResult.blobUrl);
+          
+          console.log('✅ PDF uploaded successfully!');
+          console.log(`📋 Upload result:`);
+          console.log(`   └── Blob URL: "${pdfUploadResult.blobUrl}"`);
+          console.log(`   └── Blob Name: "${pdfUploadResult.blobName}"`);
+          console.log(`   └── Temp ID: "${pdfUploadResult.tempId}"`);
+          console.log(`   └── Original Name: "${pdfUploadResult.originalFileName}"`);
+          console.log(`   └── Size: ${pdfUploadResult.size} bytes`);
+          
+          // ✅ Validate upload result has required fields
+          if (!pdfUploadResult.blobName) {
+            throw new Error('PDF upload result missing blobName - this is required for renaming');
+          }
+          if (!pdfUploadResult.tempId) {
+            throw new Error('PDF upload result missing tempId - this is required for tracking');
+          }
+          if (!pdfUploadResult.blobUrl) {
+            throw new Error('PDF upload result missing blobUrl - this is required for storage');
+          }
+          
         } catch (pdfErr) {
           console.error('❌ PDF upload failed:', pdfErr);
+          console.error('📋 PDF upload error details:', {
+            error: pdfErr instanceof Error ? pdfErr.message : 'Unknown error',
+            fileName: invoiceData.pdfFile.name,
+            fileSize: invoiceData.pdfFile.size,
+            fileType: invoiceData.pdfFile.type
+          });
           setError(`PDF upload failed: ${pdfErr instanceof Error ? pdfErr.message : 'Unknown error'}`);
           return;
         }
+      } else {
+        console.log('ℹ️ No PDF file to upload, proceeding without PDF');
       }
 
-      // Step 2: Create request with PDF URL and temp ID
+      // Step 2: Create request with PDF URL and blob information
+      console.log('🔄 Step 2: Creating request with invoice and GL coding data...');
+      
       const requestData = {
         ...invoiceData,
-        // Remove File object and add blob info
+        // ✅ Remove File object and add blob info
         pdfFile: undefined,
         pdfUrl: pdfUploadResult?.blobUrl,
         pdfOriginalName: pdfUploadResult?.originalFileName,
-        pdfTempId: pdfUploadResult?.tempId, // For later PDF renaming
-        blobName: pdfUploadResult?.blobName, // ✅ FIX: Add direct blob name
+        pdfTempId: pdfUploadResult?.tempId,
+        blobName: pdfUploadResult?.blobName, // ✅ CRITICAL: Direct blob name for renaming
       };
+
+      console.log('📋 Request data being sent:');
+      console.log(`   └── Company: "${requestData.company}"`);
+      console.log(`   └── Branch: "${requestData.branch}"`);
+      console.log(`   └── Vendor: "${requestData.vendor}"`);
+      console.log(`   └── PO: "${requestData.po}"`);
+      console.log(`   └── Amount: ${requestData.amount} ${requestData.currency}`);
+      console.log(`   └── PDF URL: "${requestData.pdfUrl || 'None'}"`);
+      console.log(`   └── PDF Original Name: "${requestData.pdfOriginalName || 'None'}"`);
+      console.log(`   └── PDF Temp ID: "${requestData.pdfTempId || 'None'}"`);
+      console.log(`   └── Blob Name: "${requestData.blobName || 'None'}"`); // ✅ Log the critical blobName
+
+      // ✅ Validate request data before sending
+      const validationErrors: string[] = [];
+      
+      if (!requestData.company) validationErrors.push('Company is required');
+      if (!requestData.branch) validationErrors.push('Branch is required');
+      if (!requestData.vendor) validationErrors.push('Vendor is required');
+      if (!requestData.po) validationErrors.push('PO is required');
+      if (!requestData.amount || requestData.amount <= 0) validationErrors.push('Valid amount is required');
+      if (!userEmail) validationErrors.push('User email is required');
+      if (!glCodingData || glCodingData.length === 0) validationErrors.push('GL Coding data is required');
+      
+      // ✅ If PDF was uploaded, validate all PDF-related fields are present
+      if (pdfUploadResult) {
+        if (!requestData.pdfUrl) validationErrors.push('PDF URL missing after upload');
+        if (!requestData.blobName) validationErrors.push('Blob name missing after upload - PDF renaming will fail');
+        if (!requestData.pdfTempId) validationErrors.push('PDF temp ID missing after upload');
+      }
+
+      if (validationErrors.length > 0) {
+        const errorMessage = `Request validation failed: ${validationErrors.join(', ')}`;
+        console.error('❌ Request validation failed:', validationErrors);
+        throw new Error(errorMessage);
+      }
+
+      console.log('✅ Request data validation passed');
 
       const formData = new FormData();
       formData.append('invoiceData', JSON.stringify(requestData));
       formData.append('glCodingData', JSON.stringify(glCodingData));
       formData.append('requester', userEmail);
 
-      console.log('🔄 Creating request with PDF URL...');
-      console.log('📋 Request data includes blobName:', !!requestData.blobName);
+      console.log('🔄 Sending request to API...');
+      console.log(`📋 FormData contents:`);
+      console.log(`   └── invoiceData: ${JSON.stringify(requestData).length} characters`);
+      console.log(`   └── glCodingData: ${glCodingData.length} entries`);
+      console.log(`   └── requester: "${userEmail}"`);
+      console.log(`   └── blobName included: ${!!requestData.blobName ? '✅ Yes' : '❌ No'}`);
 
+      const apiStartTime = Date.now();
       const response = await fetch('/api/requests/create', {
         method: 'POST',
         body: formData,
       });
+      const apiDuration = Date.now() - apiStartTime;
+
+      console.log(`📡 API Response received in ${apiDuration}ms:`);
+      console.log(`   └── Status: ${response.status} ${response.statusText}`);
+      console.log(`   └── OK: ${response.ok ? '✅ Yes' : '❌ No'}`);
 
       const result = await response.json();
+      console.log('📋 API Response data:', result);
 
       if (!response.ok) {
+        console.error('❌ API request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: result.error,
+          details: result
+        });
         throw new Error(result.error || 'Failed to create request');
       }
 
-      console.log('✅ Request created successfully with PDF');
+      console.log('✅ Request created successfully!');
+      console.log('📋 Final result:', {
+        requestId: result.requestId || result.data?.requestId,
+        filesProcessed: result.filesProcessed || result.data?.filesProcessed,
+        warnings: result.warnings || result.data?.warnings,
+        pdfUrl: result.pdfUrl || result.data?.pdfUrl,
+        excelUrl: result.excelUrl || result.data?.excelUrl
+      });
+
+      // ✅ Check for warnings in the response
+      const warnings = result.warnings || result.data?.warnings;
+      if (warnings && warnings.length > 0) {
+        console.warn('⚠️ Request created with warnings:', warnings);
+        // Could show warnings to user if needed
+      }
+
       setSuccess(true);
       setCurrentStep('submit');
       
       // Reset form after 3 seconds
       setTimeout(() => {
+        console.log('🔄 Resetting form after successful submission');
         setCurrentStep('invoice');
         setInvoiceData(null);
         setGLCodingData([]);
@@ -143,19 +252,31 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
       }, 3000);
 
     } catch (err) {
-      console.error('❌ Request creation failed:', err);
+      console.error('❌ Request creation process failed!');
+      console.error('📋 Error details:', {
+        error: err instanceof Error ? err.message : 'Unknown error',
+        type: err instanceof Error ? err.constructor.name : typeof err,
+        invoiceDataPresent: !!invoiceData,
+        glCodingDataCount: glCodingData.length,
+        userEmail: userEmail,
+        currentStep: currentStep
+      });
+      
       setError(err instanceof Error ? err.message : 'Failed to create request');
     } finally {
       setLoading(false);
+      console.log('🏁 Final submission process completed');
     }
   };
 
   const handleBackToInvoice = () => {
+    console.log('🔄 Navigating back to invoice step');
     setCurrentStep('invoice');
     setError(null);
   };
 
   const handleBackToGLCoding = () => {
+    console.log('🔄 Navigating back to GL coding step');
     setCurrentStep('gl-coding');
     setError(null);
   };
@@ -163,12 +284,17 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   // Combined loading state
   const isSubmitting = loading || pdfUploading;
 
+  // ✅ Success screen with enhanced feedback
   if (success) {
     return (
       <div className="text-center py-12">
         <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h3 className="text-xl font-semibold text-gray-900 mb-2">Request Created Successfully!</h3>
-        <p className="text-gray-600">Your request has been submitted for approval.</p>
+        <p className="text-gray-600 mb-4">Your request has been submitted for approval.</p>
+        <div className="text-sm text-gray-500">
+          <p>You can view the status of your request in the "My Requests" tab.</p>
+          <p className="mt-1">Redirecting to invoice form in a moment...</p>
+        </div>
       </div>
     );
   }
@@ -185,164 +311,123 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
         </div>
         
         <div className="flex items-center space-x-4">
-          <div className={`flex items-center ${currentStep === 'invoice' ? 'text-blue-600' : 'text-green-600'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              currentStep === 'invoice' ? 'bg-blue-100' : 'bg-green-100'
-            }`}>
-              {currentStep === 'invoice' ? '1' : <Check className="w-4 h-4" />}
-            </div>
-            <span className="ml-2 font-medium">Invoice Data</span>
+          <div className={`flex items-center ${currentStep === 'invoice' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <FileText className="w-5 h-5 mr-2" />
+            Invoice Details
           </div>
-          
-          <div className="flex-1 h-0.5 bg-gray-200">
-            <div className={`h-full ${currentStep !== 'invoice' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
+          <div className="w-8 h-px bg-gray-300" />
+          <div className={`flex items-center ${currentStep === 'gl-coding' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <DollarSign className="w-5 h-5 mr-2" />
+            GL Coding
           </div>
-          
-          <div className={`flex items-center ${
-            currentStep === 'gl-coding' ? 'text-blue-600' : 
-            currentStep === 'validation' || currentStep === 'submit' ? 'text-green-600' : 'text-gray-400'
-          }`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              currentStep === 'gl-coding' ? 'bg-blue-100' : 
-              currentStep === 'validation' || currentStep === 'submit' ? 'bg-green-100' : 'bg-gray-100'
-            }`}>
-              {currentStep === 'validation' || currentStep === 'submit' ? <Check className="w-4 h-4" /> : '2'}
-            </div>
-            <span className="ml-2 font-medium">GL Coding</span>
-          </div>
-          
-          <div className="flex-1 h-0.5 bg-gray-200">
-            <div className={`h-full ${currentStep === 'validation' || currentStep === 'submit' ? 'bg-green-500' : 'bg-gray-200'}`}></div>
-          </div>
-          
-          <div className={`flex items-center ${currentStep === 'validation' ? 'text-blue-600' : currentStep === 'submit' ? 'text-green-600' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-              currentStep === 'validation' ? 'bg-blue-100' : currentStep === 'submit' ? 'bg-green-100' : 'bg-gray-100'
-            }`}>
-              {currentStep === 'submit' ? <Check className="w-4 h-4" /> : '3'}
-            </div>
-            <span className="ml-2 font-medium">Validation</span>
+          <div className="w-8 h-px bg-gray-300" />
+          <div className={`flex items-center ${currentStep === 'validation' ? 'text-blue-600' : 'text-gray-400'}`}>
+            <Upload className="w-5 h-5 mr-2" />
+            Review & Submit
           </div>
         </div>
       </div>
 
       {/* Error Display */}
-      {(error || pdfError) && (
-        <ErrorMessage 
-          message={error || pdfError || 'An error occurred'} 
-          onRetry={() => {
-            setError(null);
-            // Clear any PDF errors as well
-            if (pdfError) {
-              // The hook will handle clearing its own error state
-              console.log('Clearing error state');
-            }
-          }} 
-        />
+      {error && (
+        <ErrorMessage message={error} />
       )}
 
       {/* Step Content */}
       {currentStep === 'invoice' && (
-        <InvoiceForm
-          onSubmit={handleInvoiceSubmit}
-          initialData={invoiceData}
-        />
+        <InvoiceForm onSubmit={handleInvoiceSubmit} />
       )}
 
       {currentStep === 'gl-coding' && (
-        <GLCodingForm
+        <GLCodingForm 
           invoiceAmount={invoiceTotal}
           onSubmit={handleGLCodingSubmit}
           onBack={handleBackToInvoice}
-          initialData={glCodingData}
         />
       )}
 
-      {currentStep === 'validation' && invoiceData && (
+      {currentStep === 'validation' && (
         <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Review & Submit Request</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Your Request</h3>
           
           {/* Invoice Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900 flex items-center">
-                <FileText className="w-5 h-5 mr-2 text-blue-600" />
-                Invoice Details
-              </h4>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Company:</span>
-                  <span className="text-sm font-medium">{invoiceData.company}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Branch:</span>
-                  <span className="text-sm font-medium">{invoiceData.branch}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Vendor:</span>
-                  <span className="text-sm font-medium">{invoiceData.vendor}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">PO#:</span>
-                  <span className="text-sm font-medium">{invoiceData.po || 'N/A'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Amount:</span>
-                  <span className="text-sm font-medium">{invoiceData.currency} {invoiceData.amount.toFixed(2)}</span>
-                </div>
-                {invoiceData.pdfFile && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">PDF:</span>
-                    <span className="text-sm font-medium text-green-600">{invoiceData.pdfFile.name}</span>
-                  </div>
-                )}
+          <div className="mb-6">
+            <h4 className="text-md font-medium text-gray-700 mb-3">Invoice Details</h4>
+            <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Company:</span>
+                <span className="font-medium">{invoiceData?.company}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Branch:</span>
+                <span className="font-medium">{invoiceData?.branch}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Vendor:</span>
+                <span className="font-medium">{invoiceData?.vendor}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">PO:</span>
+                <span className="font-medium">{invoiceData?.po}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Amount:</span>
+                <span className="font-medium">${invoiceTotal.toFixed(2)} {invoiceData?.currency}</span>
+              </div>
+              {invoiceData?.pdfFile && (
+                <div className="flex justify-between">
+                  <span className="text-gray-600">PDF:</span>
+                  <span className="font-medium">{invoiceData.pdfFile.name}</span>
+                </div>
+              )}
             </div>
+          </div>
 
-            <div className="space-y-4">
-              <h4 className="font-medium text-gray-900 flex items-center">
-                <DollarSign className="w-5 h-5 mr-2 text-green-600" />
-                GL Coding Summary
-              </h4>
-              <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Total Entries:</span>
-                  <span className="text-sm font-medium">{glCodingData.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">GL Coding Total:</span>
-                  <span className="text-sm font-medium">{invoiceData.currency} {glCodingTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">Invoice Total:</span>
-                  <span className="text-sm font-medium">{invoiceData.currency} {invoiceTotal.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between pt-2 border-t border-gray-200">
-                  <span className="text-sm font-medium text-gray-900">Status:</span>
-                  <span className={`text-sm font-medium ${amountsMatch ? 'text-green-600' : 'text-red-600'}`}>
-                    {amountsMatch ? '✓ Amounts Match' : '✗ Amounts Mismatch'}
-                  </span>
-                </div>
+          {/* GL Coding Summary */}
+          <div className="mb-6">
+            <h4 className="text-md font-medium text-gray-700 mb-3">GL Coding ({glCodingData.length} entries)</h4>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <div className="space-y-2 mb-3">
+                {glCodingData.map((entry, index) => (
+                  <div key={index} className="flex justify-between text-sm">
+                    <span>{entry.accountCode} - {entry.facilityCode}</span>
+                    <span className="font-medium">${entry.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t pt-2 flex justify-between font-medium">
+                <span>Total GL Coding:</span>
+                <span>${glCodingTotal.toFixed(2)}</span>
               </div>
             </div>
           </div>
 
-          {/* Amount Validation Alert */}
-          {!amountsMatch && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          {/* Amount Validation */}
+          <div className="mb-6">
+            <div className={`p-4 rounded-lg ${amountsMatch ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
               <div className="flex items-center">
-                <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
+                {amountsMatch ? (
+                  <Check className="w-5 h-5 text-green-500 mr-2" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-red-500 mr-2" />
+                )}
                 <div>
-                  <h4 className="text-sm font-medium text-red-800">Amount Mismatch</h4>
-                  <p className="text-sm text-red-700 mt-1">
-                    The GL coding total ({invoiceData.currency} {glCodingTotal.toFixed(2)}) does not match 
-                    the invoice amount ({invoiceData.currency} {invoiceTotal.toFixed(2)}). 
-                    Please review your entries before submitting.
+                  <p className={`font-medium ${amountsMatch ? 'text-green-800' : 'text-red-800'}`}>
+                    {amountsMatch ? 'Amounts Match' : 'Amount Mismatch'}
                   </p>
+                  <p className="text-sm text-red-600 mt-1">
+                    Invoice: ${invoiceTotal.toFixed(2)} | GL Coding: ${glCodingTotal.toFixed(2)}
+                    {!amountsMatch && ` | Difference: ${Math.abs(invoiceTotal - glCodingTotal).toFixed(2)}`}
+                  </p>
+                  {!amountsMatch && (
+                    <p className="text-sm text-red-600 mt-1">
+                      Please review your entries before submitting.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Action Buttons */}
           <div className="flex justify-between">
