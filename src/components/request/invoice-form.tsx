@@ -1,12 +1,13 @@
 // src/components/request/invoice-form.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
-import { DICTIONARY_FALLBACKS, API_ROUTES } from "@/constants";
-import { useCompanies } from "@/hooks/useCompanies";
+import { DICTIONARY_FALLBACKS } from "@/constants";
+import { useCompanies } from "@/hooks/use-companies";
+import { useBranches } from "@/hooks/use-branches";
 
 interface InvoiceData {
   company: string;
@@ -46,69 +47,40 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     pdfFile: initialData?.pdfFile,
   });
 
-  // Separate states for dropdown data
-  const [branches, setBranches] = useState<DictionaryItem[]>([]);
-  const [currencies, setCurrencies] = useState<CurrencyItem[]>([...DICTIONARY_FALLBACKS.currencies]);
-
-  // Loading states
-  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [currencies] = useState<CurrencyItem[]>([...DICTIONARY_FALLBACKS.currencies]);
   const [loading, setLoading] = useState(false);
-
-  // Error states
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
   // Usar hook para obtener companies (sin fallback)
   const { data: companies, isLoading: loadingCompanies, error: companiesError } = useCompanies();
 
-  // Load branches when company changes
-  useEffect(() => {
-    if (formData.company) {
-      loadBranches(formData.company);
-    } else {
-      setBranches([]);
-    }
-  }, [formData.company]);
+  // Usar hook para obtener branches según la company seleccionada
+  const { data: branches = [], isLoading: loadingBranches, error: branchesError } = useBranches(formData.company);
 
-  const loadBranches = async (companyErp: string) => {
-    try {
-      setLoadingBranches(true);
-      console.log(`🏗️ Loading branches for company: ${companyErp}`);
-
-      const response = await fetch(`${API_ROUTES.DICTIONARIES}/branches?erp=${encodeURIComponent(companyErp)}`);
-      if (!response.ok) {
-        throw new Error('Failed to load branches');
-      }
-
-      const data = await response.json();
-      if (data.success && data.data?.branches) {
-        setBranches(data.data.branches);
-        console.log(`✅ Loaded ${data.data.branches.length} branches for ${companyErp}`);
-      } else {
-        throw new Error('Invalid response format');
-      }
-    } catch (err) {
-      console.error('❌ Error loading branches:', err);
-      console.log('📋 Using empty branches list');
-      setBranches([]);
-    } finally {
-      setLoadingBranches(false);
-    }
-  };
+  // Helper para saber si la compañía seleccionada es TCRS
+  const isTcrsCompany = (() => {
+    if (!formData.company || !companies) return false;
+    const selected = companies.find((c: DictionaryItem) => c.code === formData.company);
+    // Puedes ajustar la lógica según tu base de datos: por code o description
+    return selected?.description?.toUpperCase().includes("TCRS") || selected?.code?.toUpperCase() === "TCRS";
+  })();
 
   const handleInputChange = (field: keyof InvoiceData, value: any) => {
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
-
-      // If company changes, reset branch
+      // Si cambia la company, resetea branch y setea tcrsCompany según la selección
       if (field === 'company' && value !== prev.company) {
         newData.branch = '';
+        // Buscar la compañía seleccionada
+        const selected = companies?.find((c: DictionaryItem) => c.code === value);
+        newData.tcrsCompany =
+          selected?.description?.toUpperCase().includes("TCRS") ||
+          selected?.code?.toUpperCase() === "TCRS";
       }
-
       return newData;
     });
 
-    // Clear error when user starts typing
     if (error) {
       setError(null);
     }
@@ -164,7 +136,13 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
       return;
     }
 
-    onSubmit(formData);
+    // Forzamos tcrsCompany antes de enviar, por si acaso
+    const selected = companies?.find((c: DictionaryItem) => c.code === formData.company);
+    const tcrsCompany =
+      selected?.description?.toUpperCase().includes("TCRS") ||
+      selected?.code?.toUpperCase() === "TCRS";
+
+    onSubmit({ ...formData, tcrsCompany });
   };
 
   return (
@@ -233,10 +211,12 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
                     ? "Select Company first"
                     : loadingBranches
                     ? "Loading branches..."
+                    : branchesError
+                    ? "Error loading branches"
                     : "Select Branch"
                   }
                 </option>
-                {branches.map((branch) => (
+                {branches.map((branch: DictionaryItem) => (
                   <option key={branch.code} value={branch.code}>
                     {branch.description}
                   </option>
@@ -251,20 +231,12 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
             {!formData.company && (
               <p className="text-xs text-gray-500 mt-1">Please select a company first</p>
             )}
+            {branchesError && (
+              <p className="text-xs text-red-600 mt-1">
+                Could not load branches. Please try again later.
+              </p>
+            )}
           </div>
-        </div>
-
-        {/* TCRS Company Checkbox */}
-        <div>
-          <label className="flex items-center">
-            <input
-              type="checkbox"
-              checked={formData.tcrsCompany}
-              onChange={(e) => handleInputChange('tcrsCompany', e.target.checked)}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <span className="ml-2 text-sm text-gray-700">TCRS Company</span>
-          </label>
         </div>
 
         {/* Vendor and PO */}

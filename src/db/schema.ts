@@ -86,8 +86,7 @@ export const approvalRequests = pgTable('approval_requests', {
 })
 
 // Approver List Table
-export const approverList = pgTable(
-  'approver_list',
+export const approverList = pgTable('approver_list',
   {
     approverId: varchar('approver_id', { length: 255 }).primaryKey().$defaultFn(() => createId()),
     erp: varchar('erp', { length: 255 }),

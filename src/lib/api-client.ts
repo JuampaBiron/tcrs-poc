@@ -108,7 +108,22 @@ class ApiClient {
     const data = await res.json();
     return data.data.branches;
   }
+  
+  async getGLDictionaries() {
+    const res = await fetch('/api/gl-coding/dictionaries');
+    if (!res.ok) throw new Error('Failed to fetch GL dictionaries');
+    return res.json();
+  }
 
+  async validateGLAmounts(entries: any[], invoiceAmount: number) {
+    const res = await fetch('/api/gl-coding/validate-amounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries, invoiceAmount }),
+    });
+    if (!res.ok) throw new Error('Failed to validate GL amounts');
+    return res.json();
+  }
   // Search API
   async searchRequests(params: {
     query?: string
