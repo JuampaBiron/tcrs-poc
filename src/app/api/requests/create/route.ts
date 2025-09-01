@@ -23,11 +23,27 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Creating request with invoice data:', invoiceDataParsed);
     console.log('🔄 GL Coding entries count:', glCodingDataEntries.length);
 
-    // Step 1: Create request in database with GL-Coding data (get real requestId)
+    // ✅ NEW: Extract Excel file information if present
+    let initialExcelInfo = null;
+    const excelFile = formData.get('excelFile') as File | null;
+    if (excelFile) {
+      console.log('📎 Excel file detected:', excelFile.name, 'Size:', excelFile.size, 'bytes');
+      initialExcelInfo = {
+        blobUrl: `TEMP-excel-${Date.now()}-${excelFile.name}`, // Temporal placeholder
+        blobName: excelFile.name,
+        originalFileName: excelFile.name
+      };
+      console.log('✅ Excel info constructed:', initialExcelInfo);
+    } else {
+      console.log('📎 No Excel file provided in FormData');
+    }
+
+    // Step 1: Create request in database with GL-Coding data and Excel info
     const requestId = await createRequestInDatabase({
       invoiceData: invoiceDataParsed,
       glCodingData: glCodingDataEntries,
-      requester
+      requester,
+      excelInfo: initialExcelInfo  // ✅ NOW PASSING EXCEL INFO
     });
 
     console.log(`✅ Request created with ID: ${requestId}`);
@@ -59,19 +75,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2b: Rename Excel if uploaded
-    const excelInfo = await getExcelInfoFromDatabase(requestId);
-    if (excelInfo && excelInfo.tempBlobUrl) {
+    const dbExcelInfo = await getExcelInfoFromDatabase(requestId);
+    if (dbExcelInfo && dbExcelInfo.tempBlobUrl) {
       try {
         console.log('🔄 Renaming Excel with real requestId...');
-        console.log(`📎 Excel temp URL: ${excelInfo.tempBlobUrl}`);
+        console.log(`📎 Excel temp URL: ${dbExcelInfo.tempBlobUrl}`);
 
         // Extract blob name from URL
-        const tempBlobName = extractBlobNameFromUrl(excelInfo.tempBlobUrl);
+        const tempBlobName = extractBlobNameFromUrl(dbExcelInfo.tempBlobUrl);
 
         renamedExcelUrl = await renameExcelWithRequestId(
           tempBlobName,
           requestId,
-          excelInfo.originalFileName || `${requestId}.xlsx`
+          dbExcelInfo.originalFileName || `${requestId}.xlsx`
         );
 
         // Update database with final Excel URL
@@ -105,7 +121,7 @@ export async function POST(request: NextRequest) {
     if (invoiceDataParsed.pdfUrl && !filesProcessed.pdf) {
       warnings.push('PDF file may not be properly linked');
     }
-    if (excelInfo?.tempBlobUrl && !filesProcessed.excel) {
+    if (dbExcelInfo?.tempBlobUrl && !filesProcessed.excel) {
       warnings.push('Excel file may not be properly linked');
     }
 
