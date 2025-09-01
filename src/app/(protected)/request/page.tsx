@@ -14,14 +14,17 @@ export default function RequestPage() {
   const { data: session, status } = useSession();
 
   if (status === "loading") {
-    return <LoadingSpinner />;
+    return (
+      <div className="flex flex-1 items-center justify-center min-h-[60vh]">
+        <LoadingSpinner />
+      </div>
+    );
   }
 
   if (!session?.user) {
     return <ErrorMessage message="Authentication required" />;
   }
 
-  // ✅ CORRECCIÓN: Usar el rol de la sesión, NO llamar getUserRole() en el cliente
   const userRole = session?.user?.role as UserRole;
   const userEmail = session.user.email || "";
 

@@ -125,3 +125,47 @@ export interface PdfUploadResult {
   size: number;
   blobName: string;
 }
+
+
+export interface ExcelUploadResult {
+  blobUrl: string;
+  blobName: string;
+  originalFileName: string;
+  tempId: string;
+  year?: number;
+  month?: number;
+}
+
+export interface InvoiceData {
+  company: string;
+  branch: string;
+  tcrsCompany: boolean;
+  vendor: string;
+  po: string;
+  amount: number;
+  currency: string;
+  pdfFile?: File;
+  pdfUrl?: string;
+  pdfOriginalName?: string;
+  pdfTempId?: string;
+  blobName?: string;
+}
+
+export interface GLCodingEntry {
+  accountCode: string;
+  facilityCode: string;
+  taxCode: string;
+  amount: number;
+  equipment: string;
+  comments: string;
+}
+
+export interface DictionaryAccount {
+  accountCode: string;
+  accountCombined: string;
+}
+
+export interface DictionaryFacility {
+  facilityCode: string;
+  facilityCombined: string;
+}

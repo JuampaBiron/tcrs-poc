@@ -1,4 +1,3 @@
-// src/app/(protected)/layout.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -20,7 +19,7 @@ export default function ProtectedLayout({
   const { data: session, status } = useSession();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  // Loading state
+  // Loading state: show spinner centered on the whole screen
   if (status === "loading") {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">

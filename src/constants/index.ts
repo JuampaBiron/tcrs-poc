@@ -7,7 +7,7 @@ export const USER_ROLES = {
   ADMIN: "admin",
 } as const;
 
-// File upload constraints - ✅ UPDATED
+// File upload constraints 
 export const FILE_UPLOAD = {
   PDF: {
     MAX_SIZE: 10 * 1024 * 1024, // 10MB
@@ -50,14 +50,20 @@ export const AZURE_STORAGE = {
   BASE_URL: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net`,
 } as const;
 
-// File upload error messages - ✅ UPDATED
+// File upload error messages 
 export const UPLOAD_ERRORS = {
   FILE_TOO_LARGE: 'File size exceeds 10MB limit',
   INVALID_TYPE_PDF: 'Only PDF files are allowed',
-  INVALID_TYPE_EXCEL: 'Only Excel files (.xlsx, .xls) are allowed',  // ✅ ADDED
-  UPLOAD_FAILED: 'Failed to upload file to storage',  // ✅ UPDATED: Generic
+  INVALID_TYPE_EXCEL: 'Only Excel files (.xlsx, .xls) are allowed',  
+  UPLOAD_FAILED: 'Failed to upload file to storage',  
   NO_FILE: 'No file provided',
 } as const;
+
+export const isValidPdfFile = (file: File | undefined | null): boolean =>
+  !!file && (FILE_UPLOAD.PDF.ALLOWED_TYPES as readonly string[]).includes(file.type);
+
+export const isValidExcelFile = (file: File | undefined | null): boolean =>
+  !!file && (FILE_UPLOAD.EXCEL.ALLOWED_TYPES as readonly string[]).includes(file.type);
 
 export const ERROR_MESSAGES = {
   // Server errors
@@ -96,6 +102,23 @@ export const ERROR_MESSAGES = {
   AMOUNT_EXCEEDS_LIMIT: 'Amount exceeds the authorized limit.',
   INVALID_APPROVER: 'Invalid approver assigned to this request.',
   WORKFLOW_ERROR: 'Workflow processing error occurred.',
+
+  // Validation errors
+  AMOUNTS_MISMATCH: "Invoice and GL Coding amounts do not match.",
+  PDF_REQUIRED: UPLOAD_ERRORS.NO_FILE,
+  PDF_INVALID_TYPE: UPLOAD_ERRORS.INVALID_TYPE_PDF,
+  EXCEL_INVALID_TYPE: UPLOAD_ERRORS.INVALID_TYPE_EXCEL,
+  COMPANY_REQUIRED: "Company is required.",
+  BRANCH_REQUIRED: "Branch is required.",
+  VENDOR_REQUIRED: "Vendor is required.",
+  PO_REQUIRED: "PO is required.",
+  AMOUNT_REQUIRED: "Valid amount is required.",
+  USER_EMAIL_REQUIRED: "User email is required.",
+  GL_CODING_REQUIRED: "GL Coding data is required.",
+  PDF_URL_MISSING: "PDF URL missing after upload.",
+  BLOB_NAME_MISSING: "Blob name missing after upload.",
+  PDF_TEMP_ID_MISSING: "PDF temp ID missing after upload.",
+  REQUEST_VALIDATION_FAILED: "Request validation failed:",
 } as const;
 
 export const ROUTES = {
@@ -247,3 +270,4 @@ export const isValidCurrency = (
   }
   return VALID_CURRENCIES.includes(currency as any);
 };
+

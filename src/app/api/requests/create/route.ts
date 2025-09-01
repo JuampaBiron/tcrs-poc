@@ -23,19 +23,30 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Creating request with invoice data:', invoiceDataParsed);
     console.log('🔄 GL Coding entries count:', glCodingDataEntries.length);
 
-    // ✅ NEW: Extract Excel file information if present
+    // ✅ FIX: Extract Excel upload result instead of file
     let initialExcelInfo = null;
-    const excelFile = formData.get('excelFile') as File | null;
-    if (excelFile) {
-      console.log('📎 Excel file detected:', excelFile.name, 'Size:', excelFile.size, 'bytes');
-      initialExcelInfo = {
-        blobUrl: `TEMP-excel-${Date.now()}-${excelFile.name}`, // Temporal placeholder
-        blobName: excelFile.name,
-        originalFileName: excelFile.name
-      };
-      console.log('✅ Excel info constructed:', initialExcelInfo);
+    const excelUploadResultStr = formData.get('excelUploadResult') as string | null;
+    
+    if (excelUploadResultStr) {
+      try {
+        const excelUploadResult = JSON.parse(excelUploadResultStr);
+        console.log('📎 Excel upload result detected:', {
+          blobUrl: excelUploadResult.blobUrl,
+          originalFileName: excelUploadResult.originalFileName,
+          tempId: excelUploadResult.tempId
+        });
+        
+        initialExcelInfo = {
+          blobUrl: excelUploadResult.blobUrl,  // ✅ REAL Azure URL
+          blobName: excelUploadResult.blobName,
+          originalFileName: excelUploadResult.originalFileName
+        };
+        console.log('✅ Excel info constructed from upload result:', initialExcelInfo);
+      } catch (parseError) {
+        console.error('❌ Failed to parse excelUploadResult:', parseError);
+      }
     } else {
-      console.log('📎 No Excel file provided in FormData');
+      console.log('📎 No Excel upload result provided');
     }
 
     // Step 1: Create request in database with GL-Coding data and Excel info
@@ -43,7 +54,7 @@ export async function POST(request: NextRequest) {
       invoiceData: invoiceDataParsed,
       glCodingData: glCodingDataEntries,
       requester,
-      excelInfo: initialExcelInfo  // ✅ NOW PASSING EXCEL INFO
+      excelInfo: initialExcelInfo  // ✅ NOW PASSING REAL EXCEL INFO
     });
 
     console.log(`✅ Request created with ID: ${requestId}`);
@@ -75,7 +86,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 2b: Rename Excel if uploaded
+    console.log('🔍 Step 2b: Checking for Excel file to rename...');
     const dbExcelInfo = await getExcelInfoFromDatabase(requestId);
+    console.log('📊 Excel info from database:', {
+      hasExcelInfo: !!dbExcelInfo,
+      tempBlobUrl: dbExcelInfo?.tempBlobUrl,
+      originalFileName: dbExcelInfo?.originalFileName,
+      uploadId: dbExcelInfo?.uploadId
+    });
+    
     if (dbExcelInfo && dbExcelInfo.tempBlobUrl) {
       try {
         console.log('🔄 Renaming Excel with real requestId...');
@@ -83,6 +102,7 @@ export async function POST(request: NextRequest) {
 
         // Extract blob name from URL
         const tempBlobName = extractBlobNameFromUrl(dbExcelInfo.tempBlobUrl);
+        console.log(`🔗 Extracted blob name: "${tempBlobName}"`);
 
         renamedExcelUrl = await renameExcelWithRequestId(
           tempBlobName,
@@ -99,6 +119,8 @@ export async function POST(request: NextRequest) {
         console.error('❌ Excel rename failed:', excelError);
         // Continue processing, Excel error won't fail the request
       }
+    } else {
+      console.log('⚠️ No Excel file found to rename or missing tempBlobUrl');
     }
 
     // Step 3: Prepare response based on files processed

@@ -121,7 +121,7 @@ export default function DashboardPage() {
   // Loading state
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex flex-1 items-center justify-center min-h-[60vh]">
         <LoadingSpinner size="lg" text="Loading dashboard..." />
       </div>
     );
