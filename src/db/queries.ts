@@ -1,8 +1,10 @@
 import { eq, desc, and, count, sql } from "drizzle-orm"
-import { db, approvalRequests, workflowHistory, workflowSteps } from "./index"
+import { db, approvalRequests, workflowHistory, workflowSteps, invoiceData, glCodingUploadedData, glCodingData } from "./index"
 import { USER_ROLES, REQUEST_STATUS } from "@/constants"
 import { UserRole } from "@/types"
 import { approverList } from './schema'
+import { createId } from "@paralleldrive/cuid2"
+import { trackRequestCreated } from "@/lib/workflow-tracker"
 
 // ===== DICTIONARY QUERIES =====
 
@@ -321,4 +323,165 @@ export async function searchRequests(params: {
     .select()
     .from(approvalRequests)
     .orderBy(desc(approvalRequests.createdDate))
+}
+
+// ===== EXCEL & PDF REQUEST FLOW QUERIES =====
+
+/**
+ * Crea un request completo en la base de datos, incluyendo Excel info si existe.
+ */
+export async function createRequestInDatabase(data: {
+  invoiceData: any;
+  glCodingData: any[];
+  requester: string;
+  excelInfo?: { blobUrl: string; blobName: string; originalFileName: string } | null;
+}): Promise<string> {
+  const { invoiceData: invoiceFormData, glCodingData: glCodingEntries, requester, excelInfo } = data;
+
+  // Validaciones previas
+  if (!glCodingEntries || !Array.isArray(glCodingEntries) || glCodingEntries.length === 0) {
+    throw new Error('GL-Coding data is required');
+  }
+  const validationErrors: string[] = [];
+  glCodingEntries.forEach((entry: any, index: number) => {
+    if (!entry.accountCode) validationErrors.push(`Entry ${index + 1}: Account code is required`);
+    if (!entry.facilityCode) validationErrors.push(`Entry ${index + 1}: Facility code is required`);
+    if (!entry.amount || entry.amount <= 0) validationErrors.push(`Entry ${index + 1}: Valid amount is required`);
+  });
+  if (validationErrors.length > 0) {
+    throw new Error(`GL-Coding validation failed: ${validationErrors.join(', ')}`);
+  }
+
+  // Transacción
+  const requestId = `REQ-${new Date().getFullYear()}-${createId()}`;
+  await db.transaction(async (tx) => {
+    await tx.insert(approvalRequests).values({
+      requestId,
+      requester,
+      assignedApprover: null,
+      approverStatus: REQUEST_STATUS.PENDING,
+      comments: null,
+      createdDate: new Date(),
+      modifiedDate: null,
+    });
+
+    await trackRequestCreated(tx, requestId, requester);
+
+    await tx.insert(invoiceData).values({
+      invoiceId: createId(),
+      requestId,
+      company: invoiceFormData.company,
+      tcrsCompany: invoiceFormData.tcrsCompany,
+      branch: invoiceFormData.branch,
+      vendor: invoiceFormData.vendor,
+      po: invoiceFormData.po,
+      amount: invoiceFormData.amount.toString(),
+      currency: invoiceFormData.currency,
+      approver: null,
+      blobUrl: invoiceFormData.pdfUrl || null,
+      createdDate: new Date(),
+      modifiedDate: null,
+    });
+
+    const uploadId = createId();
+    await tx.insert(glCodingUploadedData).values({
+      uploadId,
+      requestId,
+      uploader: requester,
+      uploadedFile: !!excelInfo,
+      status: 'completed',
+      blobUrl: excelInfo?.blobUrl || null,
+      createdDate: new Date(),
+      modifiedDate: null,
+    });
+
+    const glEntries = glCodingEntries.map((entry: any) => ({
+      uploadId,
+      accountCode: entry.accountCode,
+      facilityCode: entry.facilityCode,
+      taxCode: entry.taxCode || null,
+      amount: entry.amount.toString(),
+      equipment: entry.equipment || null,
+      comments: entry.comments || null,
+      createdDate: new Date(),
+      modifiedDate: null,
+    }));
+
+    await tx.insert(glCodingData).values(glEntries);
+  });
+
+  return requestId;
+}
+
+/**
+ * Actualiza la URL final del PDF en la tabla invoice_data.
+ */
+export async function updateRequestPdfUrl(requestId: string, pdfUrl: string): Promise<void> {
+  await db
+    .update(invoiceData)
+    .set({
+      blobUrl: pdfUrl,
+      modifiedDate: new Date(),
+    })
+    .where(eq(invoiceData.requestId, requestId));
+}
+
+/**
+ * Obtiene la información temporal del Excel para un request.
+ */
+export async function getExcelInfoFromDatabase(requestId: string): Promise<{
+  tempBlobUrl: string | null;
+  originalFileName: string | null;
+  uploadId: string;
+} | null> {
+  const result = await db
+    .select({
+      blobUrl: glCodingUploadedData.blobUrl,
+      uploadId: glCodingUploadedData.uploadId,
+    })
+    .from(glCodingUploadedData)
+    .where(eq(glCodingUploadedData.requestId, requestId))
+    .limit(1);
+
+  if (result.length === 0 || !result[0].blobUrl) {
+    return null;
+  }
+
+  const blobUrl = result[0].blobUrl;
+  const urlParts = blobUrl.split('/');
+  const fileName = urlParts[urlParts.length - 1];
+  const originalFileName = fileName.replace(/^TEMP-[^_]+_/, '');
+
+  return {
+    tempBlobUrl: blobUrl,
+    originalFileName,
+    uploadId: result[0].uploadId,
+  };
+}
+
+/**
+ * Actualiza la URL final del Excel en la tabla gl_coding_uploaded_data.
+ */
+export async function updateRequestExcelUrl(requestId: string, excelUrl: string): Promise<void> {
+  await db
+    .update(glCodingUploadedData)
+    .set({
+      blobUrl: excelUrl,
+      uploadedFile: true,
+      modifiedDate: new Date(),
+    })
+    .where(eq(glCodingUploadedData.requestId, requestId));
+}
+
+/**
+ * Helper para extraer el blobName desde una URL de blob.
+ */
+export function extractBlobNameFromUrl(blobUrl: string): string {
+  try {
+    const url = new URL(blobUrl);
+    const pathParts = url.pathname.split('/');
+    return pathParts.slice(2).join('/');
+  } catch {
+    return blobUrl;
+  }
 }

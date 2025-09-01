@@ -3,6 +3,7 @@
 
 import { useState, useRef } from "react";
 import { FileSpreadsheet, Upload, X, AlertCircle, CheckCircle } from "lucide-react";
+import { ExcelProcessor } from "@/lib/excel-processor";
 
 interface GLCodingEntry {
   accountCode: string;
@@ -13,17 +14,9 @@ interface GLCodingEntry {
   comments: string;
 }
 
-interface Dictionaries {
-  accounts: Array<{ accountCode: string; accountDescription: string; accountCombined: string; }>;
-  facilities: Array<{ facilityCode: string; facilityDescription: string; facilityCombined: string; }>;
-  taxCodes: Array<{ code: string; description: string; }>;
-}
-
 interface ExcelUploadModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onImport: (entries: GLCodingEntry[]) => void;
-  dictionaries: Dictionaries;
+  onImport: (entries: GLCodingEntry[], file: File) => void;  // ✅ MODIFIED: Now includes File
+  onCancel: () => void;
 }
 
 interface ExcelPreviewData {
@@ -33,12 +26,10 @@ interface ExcelPreviewData {
   fileName: string;
   totalAmount: number;
 }
-export const runtime = "nodejs";
+
 export default function ExcelUploadModal({ 
-  isOpen, 
-  onClose, 
   onImport, 
-  dictionaries 
+  onCancel 
 }: ExcelUploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<ExcelPreviewData | null>(null);
@@ -46,8 +37,7 @@ export default function ExcelUploadModal({
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (!isOpen) return null;
-
+  // ✅ REFACTORED: Process Excel locally using ExcelProcessor
   const handleFileSelect = async (selectedFile: File) => {
     if (!selectedFile) return;
 
@@ -62,35 +52,28 @@ export default function ExcelUploadModal({
     setPreview(null);
 
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('requestId', 'temp-preview'); // Temporary for preview
-      formData.append('uploader', 'current-user');
-      console.log('Uploading file:', selectedFile);
-      console.log('FormData:', formData);
-
-      const response = await fetch('/api/gl-coding/excel-upload', {
-        method: 'POST',
-        body: formData
+      console.log('🔄 Processing Excel file locally:', selectedFile.name);
+      
+      // ✅ NEW: Use ExcelProcessor locally instead of API call
+      const result = await ExcelProcessor.processFile(selectedFile);
+      
+      console.log('✅ Excel processed:', {
+        entries: result.entries.length,
+        errors: result.errors.length,
+        warnings: result.warnings.length
       });
 
-      const result = await response.json();
-
-      if (response.ok) {
-        setPreview({
-          entries: result.preview || [],
-          errors: result.validationErrors || [],
-          warnings: [],
-          fileName: result.fileName || selectedFile.name,
-          totalAmount: result.totalAmount || 0
-        });
-      } else {
-        alert(result.error || 'Error processing Excel file');
-        setFile(null);
-      }
+      setPreview({
+        entries: result.entries || [],
+        errors: result.errors || [],
+        warnings: result.warnings || [],
+        fileName: result.metadata.fileName || selectedFile.name,
+        totalAmount: result.metadata.totalAmount || 0
+      });
+      
     } catch (error) {
-      console.error('Error uploading Excel:', error);
-      alert('Error processing Excel file');
+      console.error('❌ Excel processing error:', error);
+      alert(`Error processing Excel file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setFile(null);
     } finally {
       setIsProcessing(false);
@@ -125,9 +108,10 @@ export default function ExcelUploadModal({
     }
   };
 
+  // ✅ MODIFIED: Pass both entries and file to parent
   const confirmImport = () => {
-    if (preview && preview.errors.length === 0) {
-      onImport(preview.entries);
+    if (preview && preview.errors.length === 0 && file) {
+      onImport(preview.entries, file);  // ✅ Pass file too
       resetModal();
     }
   };
@@ -139,7 +123,7 @@ export default function ExcelUploadModal({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-    onClose();
+    onCancel();
   };
 
   return (
@@ -190,34 +174,33 @@ export default function ExcelUploadModal({
                 className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                   dragActive 
                     ? 'border-blue-400 bg-blue-50' 
-                    : 'border-gray-300 hover:border-gray-400'
+                    : 'border-gray-300 bg-gray-50 hover:border-gray-400'
                 }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
                 onDrop={handleDrop}
               >
-                <FileSpreadsheet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">
-                  Drag your Excel file here
-                </p>
-                <p className="text-sm text-gray-600 mb-4">
-                  or click to select file
-                </p>
+                <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                <div className="text-sm text-gray-600">
+                  <label
+                    htmlFor="file-upload"
+                    className="cursor-pointer text-blue-600 hover:text-blue-500 font-medium"
+                  >
+                    Click to upload
+                  </label>
+                  {' '}or drag and drop
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Excel files only (.xlsx, .xls)</p>
                 <input
                   ref={fileInputRef}
+                  id="file-upload"
+                  name="file-upload"
                   type="file"
+                  className="sr-only"
                   accept=".xlsx,.xls"
                   onChange={handleFileInput}
-                  className="hidden"
                 />
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Select File
-                </button>
               </div>
             </>
           )}
@@ -225,98 +208,131 @@ export default function ExcelUploadModal({
           {/* Processing State */}
           {isProcessing && (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4"></div>
               <p className="text-gray-600">Processing Excel file...</p>
             </div>
           )}
 
           {/* Preview Results */}
-          {preview && !isProcessing && (
-            <div>
+          {preview && (
+            <div className="space-y-4">
               {/* File Info */}
-              <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-                <div className="flex justify-between items-center">
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <h4 className="font-medium text-gray-900 mb-2">File Information</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-medium text-gray-900">{preview.fileName}</p>
-                    <p className="text-sm text-gray-600">
-                      {preview.entries.length} entries found - 
-                      Total: ${preview.totalAmount.toLocaleString()}
-                    </p>
+                    <span className="text-gray-600">Filename:</span>
+                    <span className="ml-2 font-mono">{preview.fileName}</span>
                   </div>
-                  <button
-                    onClick={() => {
-                      setFile(null);
-                      setPreview(null);
-                    }}
-                    className="text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    Change file
-                  </button>
+                  <div>
+                    <span className="text-gray-600">Entries:</span>
+                    <span className="ml-2 font-medium">{preview.entries.length}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="ml-2 font-medium">${preview.totalAmount.toLocaleString()}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Status:</span>
+                    <span className={`ml-2 font-medium ${
+                      preview.errors.length === 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {preview.errors.length === 0 ? 'Valid' : `${preview.errors.length} errors`}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Validation Results */}
+              {/* Errors */}
               {preview.errors.length > 0 && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <AlertCircle className="w-5 h-5 text-red-600 mr-2" />
-                    <h4 className="font-medium text-red-900">
-                      Errors found ({preview.errors.length})
-                    </h4>
-                  </div>
-                  <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <h4 className="font-medium text-red-800 mb-2 flex items-center">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    Validation Errors
+                  </h4>
+                  <ul className="text-sm text-red-700 space-y-1">
                     {preview.errors.map((error, index) => (
-                      <li key={index}>• {error}</li>
+                      <li key={index} className="flex items-start">
+                        <span className="mr-2">•</span>
+                        {error}
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {preview.errors.length === 0 && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
-                    <p className="font-medium text-green-900">
-                      File validated successfully - Ready to import
-                    </p>
-                  </div>
+              {/* Warnings */}
+              {preview.warnings.length > 0 && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <h4 className="font-medium text-yellow-800 mb-2 flex items-center">
+                    <AlertCircle className="w-5 h-5 mr-2" />
+                    Warnings
+                  </h4>
+                  <ul className="text-sm text-yellow-700 space-y-1">
+                    {preview.warnings.map((warning, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="mr-2">•</span>
+                        {warning}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
 
-              {/* Preview Table */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-                  <h4 className="font-medium text-gray-900">Data Preview</h4>
+              {/* Success Message */}
+              {preview.errors.length === 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <h4 className="font-medium text-green-800 mb-2 flex items-center">
+                    <CheckCircle className="w-5 h-5 mr-2" />
+                    Ready to Import
+                  </h4>
+                  <p className="text-sm text-green-700">
+                    {preview.entries.length} entries processed successfully. Total amount: ${preview.totalAmount.toLocaleString()}
+                  </p>
                 </div>
-                <div className="max-h-64 overflow-y-auto">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-white sticky top-0">
-                      <tr>
-                        <th className="px-3 py-2 text-left border-b">#</th>
-                        <th className="px-3 py-2 text-left border-b">Acc Code</th>
-                        <th className="px-3 py-2 text-left border-b">Facility</th>
-                        <th className="px-3 py-2 text-left border-b">Tax Code</th>
-                        <th className="px-3 py-2 text-left border-b">Amount</th>
-                        <th className="px-3 py-2 text-left border-b">Equipment #</th>
-                        <th className="px-3 py-2 text-left border-b">Comments</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {preview.entries.map((entry, index) => (
-                        <tr key={index} className="border-b border-gray-100">
-                          <td className="px-3 py-2">{index + 1}</td>
-                          <td className="px-3 py-2 font-mono">{entry.accountCode}</td>
-                          <td className="px-3 py-2 font-mono">{entry.facilityCode}</td>
-                          <td className="px-3 py-2">{entry.taxCode}</td>
-                          <td className="px-3 py-2 text-right">${entry.amount.toLocaleString()}</td>
-                          <td className="px-3 py-2">{entry.equipment}</td>
-                          <td className="px-3 py-2">{entry.comments}</td>
+              )}
+
+              {/* Data Preview Table */}
+              {preview.entries.length > 0 && (
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                    <h4 className="font-medium text-gray-900">Preview (First 10 entries)</h4>
+                  </div>
+                  <div className="overflow-x-auto max-h-64 overflow-y-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">#</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">Account</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">Facility</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">Tax Code</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-900">Amount</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">Equipment</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-900">Comments</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {preview.entries.slice(0, 10).map((entry, index) => (
+                          <tr key={index} className="border-b border-gray-100">
+                            <td className="px-3 py-2">{index + 1}</td>
+                            <td className="px-3 py-2 font-mono">{entry.accountCode}</td>
+                            <td className="px-3 py-2 font-mono">{entry.facilityCode}</td>
+                            <td className="px-3 py-2">{entry.taxCode}</td>
+                            <td className="px-3 py-2 text-right">${entry.amount.toLocaleString()}</td>
+                            <td className="px-3 py-2">{entry.equipment}</td>
+                            <td className="px-3 py-2">{entry.comments}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {preview.entries.length > 10 && (
+                    <div className="bg-gray-50 px-4 py-2 text-sm text-gray-600">
+                      ... and {preview.entries.length - 10} more entries
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           )}
         </div>
