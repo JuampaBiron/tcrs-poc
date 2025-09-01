@@ -7,12 +7,22 @@ export const USER_ROLES = {
   ADMIN: "admin",
 } as const;
 
-// File upload constraints
+// File upload constraints - ✅ UPDATED
 export const FILE_UPLOAD = {
   PDF: {
     MAX_SIZE: 10 * 1024 * 1024, // 10MB
     ALLOWED_TYPES: ['application/pdf'],
     MIME_TYPE: 'application/pdf'
+  },
+  // ✅ ADDED: Excel constraints
+  EXCEL: {
+    MAX_SIZE: 10 * 1024 * 1024, // 10MB
+    ALLOWED_TYPES: [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ],
+    XLSX_MIME_TYPE: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    XLS_MIME_TYPE: 'application/vnd.ms-excel'
   }
 } as const;
 
@@ -23,6 +33,7 @@ export const REQUEST_STATUS = {
   IN_REVIEW: "in-review",
 } as const;
 
+// API_ROUTES - ✅ UPDATED
 export const API_ROUTES = {
   REQUESTS: "/api/requests",
   STATS: "/api/stats",
@@ -30,6 +41,7 @@ export const API_ROUTES = {
   AUTH: "/api/auth",
   DICTIONARIES: "/api/dictionaries",
   UPLOAD_PDF: "/api/invoices/upload-pdf",
+  UPLOAD_EXCEL: "/api/gl-coding/upload-excel",  // ✅ ADDED: Nueva ruta Excel
 } as const;
 
 // Azure Blob Storage constants
@@ -38,11 +50,12 @@ export const AZURE_STORAGE = {
   BASE_URL: `https://${process.env.AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net`,
 } as const;
 
-// File upload error messages
+// File upload error messages - ✅ UPDATED
 export const UPLOAD_ERRORS = {
   FILE_TOO_LARGE: 'File size exceeds 10MB limit',
-  INVALID_TYPE: 'Only PDF files are allowed',
-  UPLOAD_FAILED: 'Failed to upload PDF to storage',
+  INVALID_TYPE_PDF: 'Only PDF files are allowed',
+  INVALID_TYPE_EXCEL: 'Only Excel files (.xlsx, .xls) are allowed',  // ✅ ADDED
+  UPLOAD_FAILED: 'Failed to upload file to storage',  // ✅ UPDATED: Generic
   NO_FILE: 'No file provided',
 } as const;
 
@@ -127,7 +140,7 @@ export const DATE_FORMATS = {
   ISO: "yyyy-MM-dd",
 } as const;
 
-// ✅ NUEVAS CONSTANTES: COMPANIES Y BRANCHES
+// ✅ COMPANIES Y BRANCHES
 export const COMPANIES = {
   TCRS: "TCRS",
   SITECH: "Sitech", 
@@ -150,50 +163,19 @@ export const FILTER_OPTIONS = {
     { value: "branch1", label: "TCRS - Branch 1" },
     { value: "branch2", label: "TCRS - Branch 2" },
     { value: "branch3", label: "TCRS - Branch 3" },
-    { value: "sitech", label: "Sitech" },
-    { value: "fused-canada", label: "Fused-Canada" },
-    { value: "fused-uk", label: "Fused-UK" },
-  ],
-  CURRENCIES: [
-    { value: CURRENCIES.CAD, label: "Canadian Dollar (CAD)" },
-    { value: CURRENCIES.USD, label: "US Dollar (USD)" },
-    { value: CURRENCIES.EUR, label: "Euro (EUR)" },
-  ],
-  AMOUNTS: [
-    { value: "0-1000", label: "$0 - $1,000" },
-    { value: "1000-5000", label: "$1,000 - $5,000" },
-    { value: "5000-10000", label: "$5,000 - $10,000" },
-    { value: "10000+", label: "$10,000+" },
-  ],
-  DATE_RANGES: [
-    { value: "today", label: "Today" },
-    { value: "week", label: "This Week" },
-    { value: "month", label: "This Month" },
-    { value: "quarter", label: "This Quarter" },
+    { value: "sitech", label: "Sitech Main" },
+    { value: "fused", label: "Fused CA" },
   ],
   STATUSES: [
     { value: REQUEST_STATUS.PENDING, label: "Pending" },
+    { value: REQUEST_STATUS.IN_REVIEW, label: "In Review" },
     { value: REQUEST_STATUS.APPROVED, label: "Approved" },
     { value: REQUEST_STATUS.REJECTED, label: "Rejected" },
-    { value: REQUEST_STATUS.IN_REVIEW, label: "In Review" },
   ],
-} as const;
-
-// ✅ MINIMAL FALLBACKS PARA DESARROLLO (solo si falla la DB)
-export const DICTIONARY_FALLBACKS = {
-  companies: [
-    { code: "TCRS", description: "TCRS" },
-    { code: "Sitech", description: "Sitech" },
-    { code: "Fused CA", description: "Fused CA" },
-  ],
-  branches: [
-    { code: "Branch 1", description: "Branch 1" },
-    { code: "Branch 2", description: "Branch 2" },
-  ],
-  currencies: [
-    { code: CURRENCIES.CAD, name: "Canadian Dollar" },
-    { code: CURRENCIES.USD, name: "US Dollar" },
-    { code: CURRENCIES.EUR, name: "Euro" },
+  CURRENCIES: [
+    { value: CURRENCIES.CAD, name: "Canadian Dollar" },
+    { value: CURRENCIES.USD, name: "US Dollar" },
+    { value: CURRENCIES.EUR, name: "Euro" },
   ],
 } as const;
 
@@ -250,7 +232,13 @@ export const isValidCompany = (
   }
   return VALID_COMPANIES.includes(company as any);
 };
-
+export const DICTIONARY_FALLBACKS = {
+  currencies: [
+    { code: CURRENCIES.CAD, name: "Canadian Dollar" },
+    { code: CURRENCIES.USD, name: "US Dollar" },
+    { code: CURRENCIES.EUR, name: "Euro" },
+  ],
+} as const;
 export const isValidCurrency = (
   currency: string | null | undefined
 ): currency is (typeof CURRENCIES)[keyof typeof CURRENCIES] => {
