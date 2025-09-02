@@ -1,5 +1,5 @@
 {
-  "id": "575d289c-9884-4c14-b96d-ca5c6bcee457",
+  "id": "1a275c10-cef9-43b3-84ef-38e7e653bcc4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -315,6 +315,12 @@
       "name": "gl_coding_data",
       "schema": "",
       "columns": {
+        "gl_coding_id": {
+          "name": "gl_coding_id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
         "upload_id": {
           "name": "upload_id",
           "type": "varchar(255)",

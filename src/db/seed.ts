@@ -2,7 +2,24 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 
-import { db, workflowSteps, approvalRequests, accountsMaster, facility, approverList, NewWorkflowStep, NewApprovalRequest, NewAccountsMaster, NewFacility, NewApproverList } from "./index"
+import { 
+  db, 
+  workflowSteps, 
+  workflowHistory,
+  approvalRequests, 
+  invoiceData,
+  accountsMaster, 
+  facility, 
+  approverList,
+  glCodingUploadedData,
+  glCodingData,
+  tiffFileGeneration,
+  NewWorkflowStep, 
+  NewApprovalRequest, 
+  NewAccountsMaster, 
+  NewFacility, 
+  NewApproverList 
+} from "./index"
 import { REQUEST_STATUS } from "@/constants"
 import { readFileSync } from 'fs'
 import { join } from 'path'
@@ -269,6 +286,92 @@ function readCSVFile(filename: string): Record<string, string>[] {
   }
 }
 
+// ===== CLEAR ALL TABLES FUNCTION =====
+export async function clearAllTables() {
+  console.log("🧹 Clearing all tables...")
+  
+  try {
+    // Delete in order to respect foreign key constraints
+    // Wrap each delete in try-catch to handle missing tables gracefully
+    
+    try {
+      console.log("   • Clearing workflow history...")
+      await db.delete(workflowHistory)
+    } catch (error) {
+      console.log("   ⚠️  workflow_history table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing GL coding data...")
+      await db.delete(glCodingData)
+    } catch (error) {
+      console.log("   ⚠️  gl_coding_data table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing GL coding uploaded data...")
+      await db.delete(glCodingUploadedData)
+    } catch (error) {
+      console.log("   ⚠️  gl_coding_uploaded_data table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing TIFF file generation...")
+      await db.delete(tiffFileGeneration)
+    } catch (error) {
+      console.log("   ⚠️  tiff_file_generation table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing invoice data...")
+      await db.delete(invoiceData)
+    } catch (error) {
+      console.log("   ⚠️  invoice_data table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing approval requests...")
+      await db.delete(approvalRequests)
+    } catch (error) {
+      console.log("   ⚠️  approval_requests table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing approver list...")
+      await db.delete(approverList)
+    } catch (error) {
+      console.log("   ⚠️  approver_list table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing facility master...")
+      await db.delete(facility)
+    } catch (error) {
+      console.log("   ⚠️  facility table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing accounts master...")
+      await db.delete(accountsMaster)
+    } catch (error) {
+      console.log("   ⚠️  accounts table doesn't exist, skipping...")
+    }
+    
+    try {
+      console.log("   • Clearing workflow steps...")
+      await db.delete(workflowSteps)
+    } catch (error) {
+      console.log("   ⚠️  workflow_steps table doesn't exist, skipping...")
+    }
+    
+    console.log("✅ Table clearing completed (some tables may not have existed)")
+    
+  } catch (error) {
+    console.error("❌ Error during table clearing process:", error)
+    throw error
+  }
+}
+
 // ===== SEEDING FUNCTIONS =====
 
 export async function seedWorkflowSteps() {
@@ -447,6 +550,49 @@ export async function seedSampleRequests() {
   }
 }
 
+// ===== COMPLETE RESET FUNCTION =====
+export async function resetDatabase() {
+  console.log("🔄 Starting complete database reset...")
+  
+  if (!process.env.DATABASE_URL) {
+    console.error("❌ DATABASE_URL environment variable is not set!")
+    console.log("💡 Make sure .env.local exists with DATABASE_URL=...")
+    process.exit(1)
+  }
+  
+  try {
+    // 1. Clear all tables
+    await clearAllTables()
+    
+    // 2. Seed technical data
+    console.log("\n📋 Seeding technical data...")
+    await seedWorkflowSteps()
+    
+    // 3. Seed master data from CSVs
+    console.log("\n📚 Seeding master data from CSVs...")
+    await seedAccountsMaster()
+    await seedFacilityMaster()
+    await seedApproverList()
+    
+    // 4. Seed sample transactional data
+    console.log("\n📝 Seeding sample transactional data...")
+    await seedSampleRequests()
+    
+    console.log("\n✅ Database reset and seeding completed successfully!")
+    console.log("🎯 Summary:")
+    console.log("   • 15 workflow steps (technical)")
+    console.log("   • Accounts master data (from CSV)")
+    console.log("   • Facility master data (from CSV)")
+    console.log("   • Approver list (from CSV)")
+    console.log("   • 5 sample approval requests")
+    
+  } catch (error) {
+    console.error("💥 Database reset failed:", error)
+    throw error
+  }
+}
+
+// ===== REGULAR SEED FUNCTION (PRESERVES EXISTING DATA) =====
 export async function seedDatabase() {
   console.log("🌱 Starting comprehensive database seed...")
   
@@ -484,15 +630,30 @@ export async function seedDatabase() {
   }
 }
 
+// ===== MAIN EXECUTION =====
 // Run seed if called directly
 if (require.main === module) {
-  seedDatabase()
-    .then(() => {
-      console.log("🎉 All seeding completed successfully!")
-      process.exit(0)
-    })
-    .catch((error) => {
-      console.error("💥 Seeding failed:", error)
-      process.exit(1)
-    })
+  const command = process.argv[2]
+  
+  if (command === 'reset') {
+    resetDatabase()
+      .then(() => {
+        console.log("🎉 Database reset completed successfully!")
+        process.exit(0)
+      })
+      .catch((error) => {
+        console.error("💥 Database reset failed:", error)
+        process.exit(1)
+      })
+  } else {
+    seedDatabase()
+      .then(() => {
+        console.log("🎉 All seeding completed successfully!")
+        process.exit(0)
+      })
+      .catch((error) => {
+        console.error("💥 Seeding failed:", error)
+        process.exit(1)
+      })
+  }
 }

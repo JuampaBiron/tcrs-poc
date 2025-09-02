@@ -126,6 +126,7 @@ export const glCodingUploadedData = pgTable('gl_coding_uploaded_data', {
 
 // GL Coding Data Table
 export const glCodingData = pgTable('gl_coding_data', {
+  glCodingId: serial('gl_coding_id').primaryKey(),
   uploadId: varchar('upload_id', { length: 255 }).notNull(),
   accountCode: varchar('account_code', { length: 255 }),
   facilityCode: varchar('facility_code', { length: 255 }),

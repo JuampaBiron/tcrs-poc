@@ -53,6 +53,7 @@ CREATE TABLE "facility" (
 );
 --> statement-breakpoint
 CREATE TABLE "gl_coding_data" (
+	"gl_coding_id" serial PRIMARY KEY NOT NULL,
 	"upload_id" varchar(255) NOT NULL,
 	"account_code" varchar(255),
 	"facility_code" varchar(255),
