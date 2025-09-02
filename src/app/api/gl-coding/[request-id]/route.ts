@@ -7,7 +7,7 @@ import { getGLCodingDataByRequestId } from '@/db/queries';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { requestId: string } }
+  { params }: { params: Promise<{ "request-id": string }> }
 ) {
   try {
     console.log('🔄 [API] gl-coding/[requestId] endpoint hit');
@@ -38,7 +38,7 @@ export async function GET(
       }, { status: 403 });
     }
 
-    const { requestId } = params;
+    const { "request-id": requestId } = await params;
     
     if (!requestId) {
       throw new ValidationError('Missing required parameter: requestId');
