@@ -5,7 +5,7 @@ import { UserRole } from "@/types"
 import { approverList } from './schema'
 import { createId } from "@paralleldrive/cuid2"
 import { trackRequestCreated } from "@/lib/workflow-tracker"
-
+import type { GLCodingEntry } from '@/types';
 // ===== DICTIONARY QUERIES =====
 
 /**
@@ -540,5 +540,34 @@ export async function getMyRequestsWithDetails(userEmail: string) {
   console.log("🔎 [getMyRequestsWithDetails] user:", userEmail, "rows:", rows);
 
   return rows;
+}
+
+/**
+ * Obtiene los datos de GL Coding de una request específica
+ */
+export async function getGLCodingDataByRequestId(requestId: string): Promise<GLCodingEntry[]> {
+  const rows = await db
+    .select({
+      accountCode: glCodingData.accountCode,
+      facilityCode: glCodingData.facilityCode,
+      taxCode: glCodingData.taxCode,
+      amount: glCodingData.amount,
+      equipment: glCodingData.equipment,
+      comments: glCodingData.comments,
+    })
+    .from(glCodingUploadedData)
+    .innerJoin(glCodingData, eq(glCodingUploadedData.uploadId, glCodingData.uploadId))
+    .where(eq(glCodingUploadedData.requestId, requestId))
+    .orderBy(glCodingData.createdDate);
+
+  return rows.map(row => ({
+    id: `gl-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    accountCode: row.accountCode || '',
+    facilityCode: row.facilityCode || '',
+    taxCode: row.taxCode || '',
+    amount: parseFloat(row.amount?.toString() || '0'),
+    equipment: row.equipment || '',
+    comments: row.comments || ''
+  }));
 }
 

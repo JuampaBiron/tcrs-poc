@@ -274,3 +274,66 @@ export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps)
     refetch
   }
 }
+
+// Hook específico para GL Coding data de una request
+export function useGLCodingByRequestId(requestId: string | null) {
+  const [data, setData] = useState<any[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchGLCodingData = async () => {
+    if (!requestId) {
+      console.log('useGLCodingByRequestId: No requestId provided, skipping fetch');
+      setIsLoading(false);
+      setData([]);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log(`🔄 Fetching GL coding data for requestId: ${requestId}`);
+
+      const response = await fetch(`/api/gl-coding/${requestId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch GL coding data`);
+      }
+
+      const result = await response.json();
+      console.log(`✅ Successfully fetched ${result.data?.glCodingEntries?.length || 0} GL coding entries`);
+      
+      setData(result.data?.glCodingEntries || []);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch GL coding data';
+      console.error('❌ Error fetching GL coding data:', errorMessage);
+      setError(errorMessage);
+      setData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchGLCodingData();
+  }, [requestId]);
+
+  const refetch = () => {
+    fetchGLCodingData();
+  };
+
+  return {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } as const;
+}

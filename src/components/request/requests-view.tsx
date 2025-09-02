@@ -98,7 +98,6 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
           <>
             {activeTab === 'create' && (
               <RequesterView 
-                mode="create"
                 userEmail={userEmail}
                 user={user}
               />

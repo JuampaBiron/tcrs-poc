@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { User } from "next-auth";
 import { Check } from "lucide-react";
 import InvoiceForm from "@/components/request/invoice-form";
 import GLCodingForm from "@/components/request/gl-coding-form";
-import MyRequestsList from "@/components/request/my-requests-list";
 import ErrorMessage from "@/components/ui/error-message";
 import { usePdfUpload } from "@/hooks/use-pdf-upload";
 import { useGLDictionaries } from "@/hooks/use-gl-dictionaries";
@@ -18,8 +17,7 @@ import ProgressIndicator from "@/components/request/progress-indicator";
 import type { InvoiceData, GLCodingEntry, ExcelUploadResult } from "@/types";
 import { ERROR_MESSAGES, isValidPdfFile } from "@/constants";
 import RequestCreationSelector from "@/components/request/request-creation-selector";
-import { useRejectedRequests } from "@/hooks/use-dashboard-data";
-import { REQUEST_STATUS } from "@/constants";
+import { useGLCodingByRequestId } from "@/hooks/use-dashboard-data";
 interface RequesterViewProps {
   userEmail: string;
   user: User;
@@ -36,6 +34,17 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
   const [showSelector, setShowSelector] = useState(true);
   const [selectedRejectedRequest, setSelectedRejectedRequest] = useState<any>(null);
 
+  // GL Coding data hook for rejected request
+  const { data: rejectedGLCodingData, isLoading: loadingRejectedGL } = useGLCodingByRequestId(
+    selectedRejectedRequest?.requestId || null
+  );
+  // Pre-populate GL Coding data when rejected request GL data loads
+  useEffect(() => {
+    if (rejectedGLCodingData && rejectedGLCodingData.length > 0 && selectedRejectedRequest) {
+      console.log('🔄 Pre-populating GL Coding data from rejected request:', rejectedGLCodingData);
+      setGLCodingData(rejectedGLCodingData);
+    }
+  }, [rejectedGLCodingData, selectedRejectedRequest]);
   // PDF Upload hook
   const { uploadPdf, uploading: pdfUploading, error: pdfError } = usePdfUpload();
   const { uploadExcel, uploading: excelUploading, error: excelError } = useExcelUpload(); 
@@ -237,21 +246,21 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
         <RequestCreationSelector 
           userEmail={userEmail}
           onCreateNew={() => setShowSelector(false)}
-          onCreateFromRejected={(rejectedRequest: Request) => {
+          onCreateFromRejected={(rejectedRequest: any) => {
             setSelectedRejectedRequest(rejectedRequest);
             setShowSelector(false);
 
             // Pre-populate invoice data from rejected request
-            const prePopulatedInvoiceData = {
-              company: rejectedRequest.company || '',
-              branch: rejectedRequest.branch || '',
-              vendor: rejectedRequest.vendor || '',
-              po: rejectedRequest.po || '',
-              amount: parseFloat(rejectedRequest.amount as any) || 0,
-              currency: rejectedRequest.currency || 'USD',
-              tcrsCompany: rejectedRequest.tcrsCompany || '', // <-- Agregado
-              pdfFile: null,
-            };
+          const prePopulatedInvoiceData: InvoiceData = {
+            company: rejectedRequest.company || '',
+            branch: rejectedRequest.branch || '',
+            vendor: rejectedRequest.vendor || '',
+            po: rejectedRequest.po || '',
+            amount: parseFloat(rejectedRequest.amount as any) || 0,
+            currency: rejectedRequest.currency || 'CAD',
+            tcrsCompany: rejectedRequest.tcrsCompany || false,
+            pdfFile: undefined,
+          };
 
             setInvoiceData(prePopulatedInvoiceData);
             setCurrentStep('invoice');
@@ -265,6 +274,10 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
         <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
           <p className="text-sm text-orange-800">
             📝 Recreating from rejected request: <strong>{selectedRejectedRequest.vendor}</strong> - {selectedRejectedRequest.currency} {selectedRejectedRequest.amount}
+            {loadingRejectedGL && <span className="ml-2">• Loading GL Coding data...</span>}
+            {rejectedGLCodingData && rejectedGLCodingData.length > 0 && (
+              <span className="ml-2">• {rejectedGLCodingData.length} GL entries loaded</span>
+            )}
           </p>
         </div>
       )}
@@ -325,6 +338,7 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
               invoiceAmount={invoiceTotal}
               onSubmit={handleGLCodingSubmit}
               onBack={handleBackToInvoice}
+              initialData={glCodingData.length > 0 ? glCodingData : undefined}
             />
           )}
 
