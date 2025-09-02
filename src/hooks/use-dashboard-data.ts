@@ -8,20 +8,114 @@ interface UseDashboardDataProps {
   userRole: UserRole | null  
   userEmail: string
 }
-// Hook para requests del usuario actual (My Requests)
+
+// Interface específica para los datos que devuelve getMyRequestsWithDetails
+interface MyRequestFromDB {
+  requestId: string;
+  requester: string;
+  approverStatus: string;
+  amount: number;
+  company: string;
+  branch: string;
+  vendor: string;
+  po: string;
+  currency: string;
+  createdDate: Date | string;
+  assignedApprover: string;
+}
+
+// Hook específico para requests del usuario (My Requests)
 export function useMyRequests(userEmail: string) {
-  const { requests, loading, error, refetch } = useDashboardData({
-    userRole: USER_ROLES.REQUESTER,
-    userEmail,
-  });
+  const [data, setData] = useState<Request[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchMyRequests = async () => {
+    if (!userEmail) {
+      console.log('useMyRequests: No email provided, skipping fetch');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log(`🔄 Fetching my requests for email: ${userEmail}`);
+
+      // Llamar directamente al endpoint específico de my-requests
+      const params = new URLSearchParams({ 
+        email: userEmail 
+      });
+
+      const response = await fetch(`/api/requests/my-requests?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch my requests`);
+      }
+
+      const result = await response.json();
+      console.log('🔍 Raw API response:', result);
+
+      // Transformar los datos de DB al formato esperado por el componente
+      const transformedRequests: Request[] = (result.data?.requests || []).map((dbRequest: MyRequestFromDB) => ({
+        id: dbRequest.requestId,
+        title: `${dbRequest.vendor || 'Unknown Vendor'} - ${dbRequest.currency} ${dbRequest.amount || '0'}`, // Crear título sintético
+        status: dbRequest.approverStatus || 'pending',
+        reviewer: dbRequest.assignedApprover || 'Unassigned',
+        requester: dbRequest.requester || userEmail,
+        submittedOn: typeof dbRequest.createdDate === 'string' 
+          ? dbRequest.createdDate 
+          : dbRequest.createdDate?.toISOString?.() || new Date().toISOString(),
+        amount: dbRequest.amount?.toString() || '0',
+        branch: dbRequest.branch || 'Unknown',
+        // Campos adicionales para mantener compatibilidad con my-requests-list.tsx
+        requestId: dbRequest.requestId,
+        vendor: dbRequest.vendor,
+        po: dbRequest.po,
+        currency: dbRequest.currency,
+        company: dbRequest.company,
+        approverStatus: dbRequest.approverStatus,
+        createdDate: dbRequest.createdDate,
+        assignedApprover: dbRequest.assignedApprover
+      }));
+
+      console.log(`✅ Successfully transformed ${transformedRequests.length} requests`);
+      setData(transformedRequests);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch my requests';
+      console.error('❌ Error fetching my requests:', errorMessage);
+      setError(errorMessage);
+      setData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMyRequests();
+  }, [userEmail]);
+
+  const refetch = () => {
+    fetchMyRequests();
+  };
 
   return {
-    data: requests, // requests debe ser el array de requests del usuario
-    isLoading: loading,
+    data,
+    isLoading,
     error,
     refetch,
   };
 }
+
+// Hook genérico para dashboard data (sin cambios)
 export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
   const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, approved: 0, rejected: 0 })

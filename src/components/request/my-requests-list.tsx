@@ -16,35 +16,58 @@ interface MyRequestsListProps {
 }
 
 export default function MyRequestsList({ userEmail }: MyRequestsListProps) {
-  const { data, isLoading, error } = useMyRequests(userEmail);
+  const { data, isLoading, error, refetch } = useMyRequests(userEmail);
   const [statusFilter, setStatusFilter] = useState<RequestStatus | "all">("all");
   const [sortBy, setSortBy] = useState<"date" | "status" | "amount">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
   const filteredAndSortedRequests = useMemo(() => {
-    if (!data) return [];
-    return data
-      .filter(
-        (req: any) =>
-          statusFilter === "all" || req.approverStatus === statusFilter
-      )
-      .sort((a: any, b: any) => {
-        let comparison = 0;
-        switch (sortBy) {
-          case "date":
-            comparison =
-              new Date(a.createdDate).getTime() -
-              new Date(b.createdDate).getTime();
-            break;
-          case "status":
-            comparison = a.approverStatus.localeCompare(b.approverStatus);
-            break;
-          case "amount":
-            comparison = parseFloat(a.amount) - parseFloat(b.amount);
-            break;
-        }
-        return sortOrder === "asc" ? comparison : -comparison;
-      });
+    console.log("🔍 [MyRequestsList] Raw data from hook:", data);
+    
+    if (!data || data.length === 0) {
+      console.log("🔍 [MyRequestsList] No data available");
+      return [];
+    }
+
+    // Filtrar por status
+    const filtered = data.filter((req: any) => {
+      // El hook ya transforma approverStatus a status, pero mantenemos ambas para compatibilidad
+      const requestStatus = req.status || req.approverStatus || REQUEST_STATUS.PENDING;
+      return statusFilter === "all" || requestStatus === statusFilter;
+    });
+
+    console.log(`🔍 [MyRequestsList] After filtering: ${filtered.length} requests`);
+
+    // Ordenar
+    const sorted = filtered.sort((a: any, b: any) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case "date":
+          // Usar tanto createdDate como submittedOn para compatibilidad
+          const dateA = new Date(a.createdDate || a.submittedOn || '').getTime();
+          const dateB = new Date(b.createdDate || b.submittedOn || '').getTime();
+          comparison = dateA - dateB;
+          break;
+        case "status":
+          const statusA = a.status || a.approverStatus || '';
+          const statusB = b.status || b.approverStatus || '';
+          comparison = statusA.localeCompare(statusB);
+          break;
+        case "amount":
+          const amountA = parseFloat(a.amount || '0');
+          const amountB = parseFloat(b.amount || '0');
+          comparison = amountA - amountB;
+          break;
+        default:
+          comparison = 0;
+      }
+      
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    console.log(`🔍 [MyRequestsList] After sorting: ${sorted.length} requests`);
+    return sorted;
   }, [data, statusFilter, sortBy, sortOrder]);
 
   const handleSort = (newSortBy: typeof sortBy) => {
@@ -56,12 +79,42 @@ export default function MyRequestsList({ userEmail }: MyRequestsListProps) {
     }
   };
 
+  // Helper para formatear el monto
+  const formatAmount = (amount: string | number | undefined) => {
+    if (!amount || isNaN(Number(amount))) return "—";
+    return Number(amount).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
+  // Helper para formatear la fecha
+  const formatDate = (date: string | Date | undefined) => {
+    if (!date) return "—";
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch {
+      return "—";
+    }
+  };
+
+  console.log("🔍 [MyRequestsList] Render - isLoading:", isLoading, "error:", error, "dataLength:", data?.length);
+
   if (isLoading) {
-    return <LoadingSpinner />;
+    return <LoadingSpinner size="lg" text="Loading your requests..." />;
   }
 
   if (error) {
-    return <ErrorMessage message="Failed to load your requests." />;
+    return (
+      <ErrorMessage 
+        message="Failed to load your requests." 
+        onRetry={refetch}
+      />
+    );
   }
 
   if (!data || data.length === 0) {
@@ -141,6 +194,7 @@ export default function MyRequestsList({ userEmail }: MyRequestsListProps) {
           </div>
         </div>
       </div>
+
       {/* Requests List */}
       {filteredAndSortedRequests.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
@@ -196,47 +250,59 @@ export default function MyRequestsList({ userEmail }: MyRequestsListProps) {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAndSortedRequests.map((req: any) => (
-                  <tr key={req.requestId} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">{req.requestId}</td>
-                    <td className="px-6 py-4">{req.vendor || "—"}</td>
-                    <td className="px-6 py-4">{req.po || "—"}</td>
-                    <td className="px-6 py-4">{req.branch || "—"}</td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={req.approverStatus} />
+                  <tr key={req.id || req.requestId} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                      {req.requestId || req.id || "—"}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {req.amount && !isNaN(Number(req.amount))
-                        ? Number(req.amount).toLocaleString("en-CA", { minimumFractionDigits: 2 })
-                        : "0.00"}
+                      {req.vendor || "—"}
                     </td>
-                    <td className="px-6 py-4">{req.currency || "—"}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {req.assignedApprover || "Not assigned"}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {req.po || "—"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
-                      {req.createdDate
-                        ? new Date(req.createdDate).toLocaleDateString("en-CA", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          })
-                        : "—"}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {req.branch || "—"}
                     </td>
-                    <td className="px-6 py-4 text-right text-sm space-x-2">
-                      <button
-                        className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        <Eye className="w-3 h-3 mr-1" />
-                        View
-                      </button>
-                      {req.canEdit && req.approverStatus === REQUEST_STATUS.REJECTED && (
+                    <td className="px-6 py-4">
+                      <StatusBadge status={req.status || req.approverStatus} />
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {formatAmount(req.amount)}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {req.currency || "—"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {req.reviewer || req.assignedApprover || "Unassigned"}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {formatDate(req.createdDate || req.submittedOn)}
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end space-x-2">
                         <button
-                          className="inline-flex items-center px-3 py-1 border border-transparent rounded-md text-xs font-medium text-white bg-blue-600 hover:bg-blue-700"
+                          onClick={() => {
+                            console.log("View request:", req.requestId || req.id);
+                            // TODO: Implementar navegación a detalle
+                          }}
+                          className="flex items-center space-x-1 px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors text-xs"
                         >
-                          <Edit2 className="w-3 h-3 mr-1" />
-                          Edit
+                          <Eye size={12} />
+                          <span>View</span>
                         </button>
-                      )}
+                        {(req.status === REQUEST_STATUS.PENDING || req.approverStatus === REQUEST_STATUS.PENDING) && (
+                          <button
+                            onClick={() => {
+                              console.log("Edit request:", req.requestId || req.id);
+                              // TODO: Implementar edición
+                            }}
+                            className="flex items-center space-x-1 px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-xs"
+                          >
+                            <Edit2 size={12} />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
