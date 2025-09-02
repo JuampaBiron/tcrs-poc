@@ -2,12 +2,26 @@
 import { useState, useEffect } from 'react'
 import { UserRole, Request, Stats } from '@/types'
 import { apiClient } from '@/lib/api-client'
+import { USER_ROLES } from '@/constants'
 
 interface UseDashboardDataProps {
-  userRole: UserRole | null  // null = no autorizado
+  userRole: UserRole | null  
   userEmail: string
 }
+// Hook para requests del usuario actual (My Requests)
+export function useMyRequests(userEmail: string) {
+  const { requests, loading, error, refetch } = useDashboardData({
+    userRole: USER_ROLES.REQUESTER,
+    userEmail,
+  });
 
+  return {
+    data: requests, // requests debe ser el array de requests del usuario
+    isLoading: loading,
+    error,
+    refetch,
+  };
+}
 export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
   const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente
   const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, approved: 0, rejected: 0 })

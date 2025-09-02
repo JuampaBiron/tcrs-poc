@@ -516,3 +516,29 @@ export function extractBlobNameFromUrl(blobUrl: string): string {
     return blobUrl;
   }
 }
+
+// Trae requests del usuario con datos auxiliares - TO BE USED ON MY REQUESTS
+export async function getMyRequestsWithDetails(userEmail: string) {
+  const rows = await db
+    .select({
+      requestId: approvalRequests.requestId,
+      requester: approvalRequests.requester,
+      approverStatus: approvalRequests.approverStatus,
+      amount: invoiceData.amount,
+      company: invoiceData.company,
+      branch: invoiceData.branch,
+      vendor: invoiceData.vendor,      
+      po: invoiceData.po,              
+      currency: invoiceData.currency,  
+      createdDate: approvalRequests.createdDate,
+      assignedApprover: approvalRequests.assignedApprover,
+    })
+    .from(approvalRequests)
+    .leftJoin(invoiceData, eq(approvalRequests.requestId, invoiceData.requestId))
+    .where(eq(approvalRequests.requester, userEmail))
+    .orderBy(desc(approvalRequests.createdDate));
+  console.log("🔎 [getMyRequestsWithDetails] user:", userEmail, "rows:", rows);
+
+  return rows;
+}
+
