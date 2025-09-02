@@ -31,7 +31,6 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  // const [excelFile, setExcelFile] = useState<File | null>(null); // ANTES
   const [excelUploadResult, setExcelUploadResult] = useState<ExcelUploadResult | null>(null); 
 
   // PDF Upload hook

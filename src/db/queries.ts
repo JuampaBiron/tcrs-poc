@@ -328,14 +328,38 @@ export async function searchRequests(params: {
 // ===== EXCEL & PDF REQUEST FLOW QUERIES =====
 
 /**
- * Crea un request completo en la base de datos, incluyendo Excel info si existe.
+ * Busca el approver adecuado para una request según company, branch y monto.
+ */
+export async function findApproverForRequest(company: string, branch: string, amount: number) {
+  const approver = await db
+    .select()
+    .from(approverList)
+    .where(
+      and(
+        eq(approverList.erp, company),
+        eq(approverList.branch, branch),
+        sql`${approverList.authorizedAmount} >= ${amount}`
+      )
+    )
+    .orderBy(approverList.authorizedAmount)
+    .limit(1);
+    console.log('************ searching company:', company, typeof company);
+    console.log('************ searching branch:', branch, typeof branch);
+    console.log('************ searching amount:', amount, typeof amount);
+    console.log('************ Found approver:', approver);
+    
+  return approver[0]?.emailAddress || null;
+}
+
+/**
+ * Crea un request completo en la base de datos, incluyendo Excel info si existe y asignando el approver correcto.
  */
 export async function createRequestInDatabase(data: {
   invoiceData: any;
   glCodingData: any[];
   requester: string;
   excelInfo?: { blobUrl: string; blobName: string; originalFileName: string } | null;
-}): Promise<string> {
+}): Promise<{ requestId: string; assignedApprover: string | null }> {
   const { invoiceData: invoiceFormData, glCodingData: glCodingEntries, requester, excelInfo } = data;
 
   // Validaciones previas
@@ -352,13 +376,20 @@ export async function createRequestInDatabase(data: {
     throw new Error(`GL-Coding validation failed: ${validationErrors.join(', ')}`);
   }
 
+  // Buscar approver antes de la transacción
+  const approverEmail = await findApproverForRequest(
+    invoiceFormData.company,
+    invoiceFormData.branch,
+    Number(invoiceFormData.amount)
+  );
+
   // Transacción
   const requestId = `REQ-${new Date().getFullYear()}-${createId()}`;
   await db.transaction(async (tx) => {
     await tx.insert(approvalRequests).values({
       requestId,
       requester,
-      assignedApprover: null,
+      assignedApprover: approverEmail,
       approverStatus: REQUEST_STATUS.PENDING,
       comments: null,
       createdDate: new Date(),
@@ -377,7 +408,7 @@ export async function createRequestInDatabase(data: {
       po: invoiceFormData.po,
       amount: invoiceFormData.amount.toString(),
       currency: invoiceFormData.currency,
-      approver: null,
+      approver: approverEmail,
       blobUrl: invoiceFormData.pdfUrl || null,
       createdDate: new Date(),
       modifiedDate: null,
@@ -410,7 +441,7 @@ export async function createRequestInDatabase(data: {
     await tx.insert(glCodingData).values(glEntries);
   });
 
-  return requestId;
+  return { requestId, assignedApprover: approverEmail };
 }
 
 /**
