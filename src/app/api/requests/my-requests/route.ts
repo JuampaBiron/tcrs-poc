@@ -46,7 +46,10 @@ export async function GET(request: NextRequest) {
     if (!email) {
       throw new ValidationError('Missing required parameter: email');
     }
-
+    // Validar statusFilter si se proporciona
+    if (statusFilter && !['pending', 'approved', 'rejected', 'in-review', 'all'].includes(statusFilter.toLowerCase())) {
+      throw new ValidationError(`Invalid status filter: ${statusFilter}. Valid values: pending, approved, rejected, in-review, all`);
+    }
     // Solo admins pueden ver requests de otros usuarios
     if (email !== userEmail && userRole !== USER_ROLES.ADMIN) {
       console.log('❌ [API] Email mismatch - user:', userEmail, 'requested:', email);
@@ -58,6 +61,14 @@ export async function GET(request: NextRequest) {
     // Obtener requests usando la query centralizada
     console.log('📋 [API] Calling getMyRequestsWithDetails for:', email);
     let requests = await getMyRequestsWithDetails(email);
+    // Filtrar por status si se proporciona
+    if (statusFilter && statusFilter !== 'all') {
+      console.log(`🔍 [API] Filtering requests by status: ${statusFilter}`);
+      requests = requests.filter(request => 
+        request.approverStatus?.toLowerCase() === statusFilter.toLowerCase()
+      );
+      console.log(`✅ [API] Filtered to ${requests.length} requests with status: ${statusFilter}`);
+    }
     console.log(`✅ [API] Fetched ${requests.length} requests for user: ${email}`);
     
     // Log de sample de datos para debugging

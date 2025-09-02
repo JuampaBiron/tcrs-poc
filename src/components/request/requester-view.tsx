@@ -17,14 +17,15 @@ import ReviewActions from "@/components/request/review-actions";
 import ProgressIndicator from "@/components/request/progress-indicator";
 import type { InvoiceData, GLCodingEntry, ExcelUploadResult } from "@/types";
 import { ERROR_MESSAGES, isValidPdfFile } from "@/constants";
-
+import RequestCreationSelector from "@/components/request/request-creation-selector";
+import { useRejectedRequests } from "@/hooks/use-dashboard-data";
+import { REQUEST_STATUS } from "@/constants";
 interface RequesterViewProps {
-  mode: 'create' | 'list';
   userEmail: string;
   user: User;
 }
 
-export default function RequesterView({ mode, userEmail, user }: RequesterViewProps) {
+export default function RequesterView({ userEmail, user }: RequesterViewProps) {
   const [currentStep, setCurrentStep] = useState<'invoice' | 'gl-coding' | 'validation' | 'submit'>('invoice');
   const [invoiceData, setInvoiceData] = useState<InvoiceData | null>(null);
   const [glCodingData, setGLCodingData] = useState<GLCodingEntry[]>([]);
@@ -32,6 +33,8 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [excelUploadResult, setExcelUploadResult] = useState<ExcelUploadResult | null>(null); 
+  const [showSelector, setShowSelector] = useState(true);
+  const [selectedRejectedRequest, setSelectedRejectedRequest] = useState<any>(null);
 
   // PDF Upload hook
   const { uploadPdf, uploading: pdfUploading, error: pdfError } = usePdfUpload();
@@ -39,11 +42,6 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
 
   // GL Dictionaries for summary display
   const { data: dictionaries } = useGLDictionaries();
-
-  // Show list view
-  if (mode === 'list') {
-    return <MyRequestsList userEmail={userEmail} />;
-  }
 
   // Calculate totals for validation
   const invoiceTotal = invoiceData?.amount || 0;
@@ -96,7 +94,35 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
 
   try {
     let pdfUploadResult = null;
-
+    // Show creation selector first
+    if (showSelector) {
+      return (
+        <RequestCreationSelector 
+          userEmail={userEmail}
+          onCreateNew={() => setShowSelector(false)}
+          onCreateFromRejected={(rejectedRequest) => {
+            setSelectedRejectedRequest(rejectedRequest);
+            setShowSelector(false);
+            
+            // Pre-populate invoice data from rejected request
+            const prePopulatedInvoiceData: InvoiceData = {
+              company: rejectedRequest.company || '',
+              branch: rejectedRequest.branch || '',
+              tcrsCompany: rejectedRequest.tcrsCompany || false,
+              vendor: rejectedRequest.vendor || '',
+              po: rejectedRequest.po || '',
+              amount: parseFloat(rejectedRequest.amount) || 0,
+              currency: rejectedRequest.currency || 'CAD',
+              pdfFile: undefined, // User will need to upload new PDF
+            };
+            
+            setInvoiceData(prePopulatedInvoiceData);
+            setCurrentStep('invoice');
+            setError(null);
+          }}
+        />
+      );
+    }
     if (invoiceData.pdfFile) {
       try {
         pdfUploadResult = await uploadPdf(invoiceData.pdfFile, 'direct');
@@ -164,6 +190,8 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
         setInvoiceData(null);
         setGLCodingData([]);
         setExcelUploadResult(null); 
+        setSelectedRejectedRequest(null);
+        setShowSelector(true);
         setSuccess(false);
       }, 3000);
 
@@ -203,59 +231,138 @@ export default function RequesterView({ mode, userEmail, user }: RequesterViewPr
   }
 
   return (
-    <div className="max-w-1xl mx-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-      {/* Progress Indicator */}
-      <ProgressIndicator currentStep={currentStep} />
+    <div className="space-y-6">
+      {/* Show creation selector first */}
+      {showSelector && (
+        <RequestCreationSelector 
+          userEmail={userEmail}
+          onCreateNew={() => setShowSelector(false)}
+          onCreateFromRejected={(rejectedRequest: Request) => {
+            setSelectedRejectedRequest(rejectedRequest);
+            setShowSelector(false);
 
-      {/* Error Display */}
-      {error && <ErrorMessage message={error} />}
+            // Pre-populate invoice data from rejected request
+            const prePopulatedInvoiceData = {
+              company: rejectedRequest.company || '',
+              branch: rejectedRequest.branch || '',
+              vendor: rejectedRequest.vendor || '',
+              po: rejectedRequest.po || '',
+              amount: parseFloat(rejectedRequest.amount as any) || 0,
+              currency: rejectedRequest.currency || 'USD',
+              tcrsCompany: rejectedRequest.tcrsCompany || '', // <-- Agregado
+              pdfFile: null,
+            };
 
-      {/* Step Content */}
-      {currentStep === 'invoice' && (
-        <InvoiceForm onSubmit={handleInvoiceSubmit} />
-      )}
-
-      {currentStep === 'gl-coding' && (
-        <GLCodingForm
-          invoiceAmount={invoiceTotal}
-          onSubmit={handleGLCodingSubmit}
-          onBack={handleBackToInvoice}
+            setInvoiceData(prePopulatedInvoiceData);
+            setCurrentStep('invoice');
+            setError(null);
+          }}
         />
       )}
 
-      {currentStep === 'validation' && (
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Your Request</h3>
+      {/* Show recreated request indicator */}
+      {!showSelector && selectedRejectedRequest && (
+        <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          <p className="text-sm text-orange-800">
+            📝 Recreating from rejected request: <strong>{selectedRejectedRequest.vendor}</strong> - {selectedRejectedRequest.currency} {selectedRejectedRequest.amount}
+          </p>
+        </div>
+      )}
 
-          {/* Invoice Summary */}
-          <ReviewInvoiceSummary
-            invoiceData={invoiceData}
-            excelUploadResult={excelUploadResult}
-            invoiceTotal={invoiceTotal}
-          />
+      {/* Success screen */}
+      {!showSelector && success && (
+        <div className="text-center py-12">
+          <Check className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Request Created Successfully!</h3>
+          <p className="text-gray-600 mb-4">Your request has been submitted for approval.</p>
+          <div className="text-sm text-gray-500">
+            <p>You can view the status of your request in the "My Requests" tab.</p>
+            <p className="mt-1">Redirecting to invoice form in a moment...</p>
+          </div>
+        </div>
+      )}
 
-          {/* GL Coding Summary */}
-          <ReviewGLCodingSummary
-            glCodingData={glCodingData}
-            dictionaries={dictionaries}
-            glCodingTotal={glCodingTotal}
-          />
+      {/* Form steps */}
+      {!showSelector && !success && (
+        <div className="max-w-1xl mx-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+          {/* Progress Indicator */}
+          <ProgressIndicator currentStep={currentStep} />
 
-          {/* Amount Validation */}
-          <ReviewAmountValidation
-            invoiceTotal={invoiceTotal}
-            glCodingTotal={glCodingTotal}
-          />
+          {/* Error Display */}
+          {error && <ErrorMessage message={error} />}
 
-          {/* Action Buttons */}
-          <ReviewActions
-            onBack={handleBackToGLCoding}
-            onSubmit={handleFinalSubmit}
-            isSubmitting={isSubmitting}
-            amountsMatch={amountsMatch}
-            pdfUploading={pdfUploading}
-            excelUploading={excelUploading}
-          />
+          {/* Step Content */}
+          {currentStep === 'invoice' && (
+            <InvoiceForm 
+              onSubmit={handleInvoiceSubmit} 
+              initialData={invoiceData ?? undefined}
+            />
+          )}
+          {/* Back to selector button */}
+          {currentStep === 'invoice' && (
+            <div className="flex justify-between items-center mb-4">
+              <button
+                onClick={() => {
+                  setShowSelector(true);
+                  setSelectedRejectedRequest(null);
+                  setInvoiceData(null);
+                  setError(null);
+                }}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+              >
+                ← Back to selection
+              </button>
+              {selectedRejectedRequest && (
+                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded">
+                  From rejected request
+                </span>
+              )}
+            </div>
+          )}
+
+          {currentStep === 'gl-coding' && (
+            <GLCodingForm
+              invoiceAmount={invoiceTotal}
+              onSubmit={handleGLCodingSubmit}
+              onBack={handleBackToInvoice}
+            />
+          )}
+
+          {currentStep === 'validation' && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Your Request</h3>
+
+              {/* Invoice Summary */}
+              <ReviewInvoiceSummary
+                invoiceData={invoiceData}
+                excelUploadResult={excelUploadResult}
+                invoiceTotal={invoiceTotal}
+              />
+
+              {/* GL Coding Summary */}
+              <ReviewGLCodingSummary
+                glCodingData={glCodingData}
+                dictionaries={dictionaries}
+                glCodingTotal={glCodingTotal}
+              />
+
+              {/* Amount Validation */}
+              <ReviewAmountValidation
+                invoiceTotal={invoiceTotal}
+                glCodingTotal={glCodingTotal}
+              />
+
+              {/* Action Buttons */}
+              <ReviewActions
+                onBack={handleBackToGLCoding}
+                onSubmit={handleFinalSubmit}
+                isSubmitting={isSubmitting}
+                amountsMatch={amountsMatch}
+                pdfUploading={pdfUploading}
+                excelUploading={excelUploading}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

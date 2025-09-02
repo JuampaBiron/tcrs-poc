@@ -64,10 +64,10 @@ export function useMyRequests(userEmail: string) {
       console.log('🔍 Raw API response:', result);
 
       // Transformar los datos de DB al formato esperado por el componente
-      const transformedRequests: Request[] = (result.data?.requests || []).map((dbRequest: MyRequestFromDB) => ({
+      const transformedRequests = (result.data?.requests || []).map((dbRequest: MyRequestFromDB) => ({
         id: dbRequest.requestId,
-        title: `${dbRequest.vendor || 'Unknown Vendor'} - ${dbRequest.currency} ${dbRequest.amount || '0'}`, // Crear título sintético
-        status: dbRequest.approverStatus || 'pending',
+        title: `${dbRequest.vendor || 'Unknown Vendor'} - ${dbRequest.currency} ${dbRequest.amount || '0'}`,
+        status: dbRequest.approverStatus || 'rejected',
         reviewer: dbRequest.assignedApprover || 'Unassigned',
         requester: dbRequest.requester || userEmail,
         submittedOn: typeof dbRequest.createdDate === 'string' 
@@ -75,12 +75,13 @@ export function useMyRequests(userEmail: string) {
           : dbRequest.createdDate?.toISOString?.() || new Date().toISOString(),
         amount: dbRequest.amount?.toString() || '0',
         branch: dbRequest.branch || 'Unknown',
-        // Campos adicionales para mantener compatibilidad con my-requests-list.tsx
+        // Campos adicionales necesarios para recrear la request
         requestId: dbRequest.requestId,
         vendor: dbRequest.vendor,
         po: dbRequest.po,
         currency: dbRequest.currency,
         company: dbRequest.company,
+        tcrsCompany: false, // Agregar campo faltante
         approverStatus: dbRequest.approverStatus,
         createdDate: dbRequest.createdDate,
         assignedApprover: dbRequest.assignedApprover
@@ -114,7 +115,95 @@ export function useMyRequests(userEmail: string) {
     refetch,
   };
 }
+// Hook específico para requests rechazadas
+export function useRejectedRequests(userEmail: string) {
+  const [data, setData] = useState<any[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  const fetchRejectedRequests = async () => {
+    if (!userEmail) {
+      console.log('useRejectedRequests: No email provided, skipping fetch');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log(`🔄 Fetching rejected requests for email: ${userEmail}`);
+
+      const params = new URLSearchParams({ 
+        email: userEmail,
+        status: 'rejected'
+      });
+
+      const response = await fetch(`/api/requests/my-requests?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch rejected requests`);
+      }
+
+      const result = await response.json();
+
+      // Transformar los datos igual que en useMyRequests
+      const transformedRequests: Request[] = (result.data?.requests || []).map((dbRequest: MyRequestFromDB) => ({
+        id: dbRequest.requestId,
+        title: `${dbRequest.vendor || 'Unknown Vendor'} - ${dbRequest.currency} ${dbRequest.amount || '0'}`,
+        status: dbRequest.approverStatus || 'rejected',
+        reviewer: dbRequest.assignedApprover || 'Unassigned',
+        requester: dbRequest.requester || userEmail,
+        submittedOn: typeof dbRequest.createdDate === 'string' 
+          ? dbRequest.createdDate 
+          : dbRequest.createdDate?.toISOString?.() || new Date().toISOString(),
+        amount: dbRequest.amount?.toString() || '0',
+        branch: dbRequest.branch || 'Unknown',
+        // Campos adicionales necesarios para recrear la request
+        requestId: dbRequest.requestId,
+        vendor: dbRequest.vendor,
+        po: dbRequest.po,
+        currency: dbRequest.currency,
+        company: dbRequest.company,
+        approverStatus: dbRequest.approverStatus,
+        createdDate: dbRequest.createdDate,
+        assignedApprover: dbRequest.assignedApprover
+      }));
+
+      console.log(`✅ Successfully transformed ${transformedRequests.length} rejected requests`);
+      setData(transformedRequests);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch rejected requests';
+      console.error('❌ Error fetching rejected requests:', errorMessage);
+      setError(errorMessage);
+      setData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRejectedRequests();
+  }, [userEmail]);
+
+  const refetch = () => {
+    fetchRejectedRequests();
+  };
+
+  return {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } as const;
+}
 // Hook genérico para dashboard data (sin cambios)
 export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
   const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente

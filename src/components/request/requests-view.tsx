@@ -33,8 +33,7 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
 
     if (userRole === USER_ROLES.REQUESTER) {
       tabs.push(
-        { id: 'create', label: 'Create Request', icon: Plus },
-        { id: 'my-requests', label: 'My Requests', icon: FileText }
+        { id: 'create', label: 'Create Request', icon: Plus }
       );
     }
 
@@ -104,13 +103,7 @@ export default function RequestsView({ userRole, userEmail, user }: RequestsView
                 user={user}
               />
             )}
-            {activeTab === 'my-requests' && (
-              <RequesterView 
-                mode="list"
-                userEmail={userEmail}
-                user={user}
-              />
-            )}
+            
           </>
         )}
 

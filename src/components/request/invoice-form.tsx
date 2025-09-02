@@ -22,7 +22,7 @@ interface InvoiceData {
 
 interface InvoiceFormProps {
   onSubmit: (data: InvoiceData) => void;
-  initialData?: InvoiceData | null;
+  initialData?: Partial<InvoiceData>;
 }
 
 interface DictionaryItem {
@@ -44,7 +44,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     po: initialData?.po || '',
     amount: initialData?.amount || 0,
     currency: initialData?.currency || 'CAD',
-    pdfFile: initialData?.pdfFile,
+    pdfFile: undefined,
   });
 
   const [currencies] = useState<CurrencyItem[]>([...DICTIONARY_FALLBACKS.currencies]);
