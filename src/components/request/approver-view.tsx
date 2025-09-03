@@ -65,7 +65,9 @@ export default function ApproverView({ userEmail, user, userRole }: ApproverView
       }
 
       const data = await response.json();
-      setRequests(data.requests || []);
+      console.log('🔍 [Frontend] API Response:', data);
+      console.log('🔍 [Frontend] Requests received:', data.data?.requests);
+      setRequests(data.data?.requests || []);
 
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load requests');
@@ -148,16 +150,6 @@ export default function ApproverView({ userEmail, user, userRole }: ApproverView
             Pending
           </button>
           <button
-            onClick={() => setFilter('assigned')}
-            className={`px-3 py-2 text-sm font-medium rounded-md ${
-              filter === 'assigned' 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Assigned to Me
-          </button>
-          <button
             onClick={() => setFilter('all')}
             className={`px-3 py-2 text-sm font-medium rounded-md ${
               filter === 'all' 
@@ -179,7 +171,6 @@ export default function ApproverView({ userEmail, user, userRole }: ApproverView
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Requests</h3>
           <p className="text-gray-600">
             {filter === 'pending' ? 'No requests are pending approval at this time.' :
-             filter === 'assigned' ? 'No requests are currently assigned to you.' :
              'No requests found.'}
           </p>
         </div>

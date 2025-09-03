@@ -192,6 +192,9 @@ export default function GLCodingForm({
         excelFileName: excelFileName
       });
 
+      // Add a minimum delay to show the spinner
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       onSubmit({ 
         entries: entries,
         excelFile: excelFile || undefined
@@ -423,13 +426,20 @@ export default function GLCodingForm({
           <button
             onClick={handleSubmit}
             disabled={!isFormValid || loading}
-            className={`px-6 py-2 rounded-md font-medium ${
+            className={`px-6 py-2 rounded-md font-medium flex items-center justify-center gap-2 ${
               isFormValid && !loading
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {loading ? 'Processing...' : 'Continue to Validation'}
+            {loading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Processing...
+              </>
+            ) : (
+              'Continue to Validation'
+            )}
           </button>
         </div>
       </div>

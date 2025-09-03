@@ -204,6 +204,100 @@ export function useRejectedRequests(userEmail: string) {
     refetch,
   } as const;
 }
+
+// Hook específico para requests asignadas al approver
+export function useApproverRequests(approverEmail: string) {
+  const [data, setData] = useState<Request[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchApproverRequests = async () => {
+    if (!approverEmail) {
+      console.log('useApproverRequests: No email provided, skipping fetch');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      console.log(`🔄 Fetching approver requests for email: ${approverEmail}`);
+
+      const params = new URLSearchParams({ 
+        email: approverEmail 
+      });
+
+      const response = await fetch(`/api/requests/approver-requests?${params}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `HTTP ${response.status}: Failed to fetch approver requests`);
+      }
+
+      const result = await response.json();
+      console.log('🔍 Raw approver API response:', result);
+
+      // Transformar los datos de DB al formato esperado por el componente
+      const transformedRequests = (result.data?.requests || []).map((dbRequest: any) => ({
+        id: dbRequest.requestId,
+        title: `${dbRequest.vendor || 'Unknown Vendor'} - ${dbRequest.currency} ${dbRequest.amount || '0'}`,
+        status: dbRequest.approverStatus || 'pending',
+        reviewer: dbRequest.assignedApprover || approverEmail,
+        requester: dbRequest.requester || 'Unknown',
+        submittedOn: typeof dbRequest.createdDate === 'string' 
+          ? dbRequest.createdDate 
+          : dbRequest.createdDate?.toISOString?.() || new Date().toISOString(),
+        amount: dbRequest.amount?.toString() || '0',
+        branch: dbRequest.branch || 'Unknown',
+        // Campos adicionales para approvers
+        requestId: dbRequest.requestId,
+        vendor: dbRequest.vendor,
+        po: dbRequest.po,
+        currency: dbRequest.currency,
+        company: dbRequest.company,
+        approverStatus: dbRequest.approverStatus,
+        createdDate: dbRequest.createdDate,
+        assignedApprover: dbRequest.assignedApprover,
+        // Campos adicionales de invoice disponibles en el schema
+        tcrsCompany: dbRequest.tcrsCompany,
+        blobUrl: dbRequest.blobUrl
+      }));
+
+      console.log(`✅ Successfully transformed ${transformedRequests.length} approver requests`);
+      setData(transformedRequests);
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch approver requests';
+      console.error('❌ Error fetching approver requests:', errorMessage);
+      setError(errorMessage);
+      setData([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApproverRequests();
+  }, [approverEmail]);
+
+  const refetch = () => {
+    fetchApproverRequests();
+  };
+
+  return {
+    data,
+    isLoading,
+    error,
+    refetch,
+  } as const;
+}
+
 // Hook genérico para dashboard data (sin cambios)
 export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
   const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente

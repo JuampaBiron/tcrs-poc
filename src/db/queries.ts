@@ -541,6 +541,35 @@ export async function getMyRequestsWithDetails(userEmail: string) {
   return rows;
 }
 
+// Get requests assigned to approver with full details (invoice + GL coding info)
+export async function getApproverRequestsWithDetails(approverEmail: string) {
+  const rows = await db
+    .select({
+      requestId: approvalRequests.requestId,
+      requester: approvalRequests.requester,
+      approverStatus: approvalRequests.approverStatus,
+      createdDate: approvalRequests.createdDate,
+      assignedApprover: approvalRequests.assignedApprover,
+      // Invoice data - only fields that exist in schema
+      amount: invoiceData.amount,
+      company: invoiceData.company,
+      branch: invoiceData.branch,
+      vendor: invoiceData.vendor,      
+      po: invoiceData.po,              
+      currency: invoiceData.currency,
+      tcrsCompany: invoiceData.tcrsCompany,
+      approver: invoiceData.approver,
+      blobUrl: invoiceData.blobUrl,
+    })
+    .from(approvalRequests)
+    .leftJoin(invoiceData, eq(approvalRequests.requestId, invoiceData.requestId))
+    .where(eq(approvalRequests.assignedApprover, approverEmail))
+    .orderBy(desc(approvalRequests.createdDate));
+    
+  console.log("🔎 [getApproverRequestsWithDetails] approver:", approverEmail, "rows:", rows.length);
+  return rows;
+}
+
 // Enhanced query for requests table with all required fields and GL coding count
 export async function getRequestsTableData(params: {
   userEmail?: string

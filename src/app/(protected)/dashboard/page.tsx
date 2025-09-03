@@ -149,33 +149,38 @@ export default function DashboardPage() {
       {/* Page Title */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Overview of your approval requests</p>
+        <p className="text-gray-600">
+          Overview of approval requests in the system
+        </p>
       </div>
 
-      {/* Dashboard Metrics */}
+      {/* Dashboard Metrics - Show for all roles */}
       <StatsCards userRole={userRole} stats={stats as Stats} />
 
-      {/* Search and Filters */}
-      <SearchFilters
-        onSearch={handleSearch}
-        onFilterChange={handleFilterChange}
-        onClearFilters={handleClearFilters}
-        onExport={handleExport}
-        userRole={userRole}
-        exportLoading={exportLoading}
-        requestsCount={filteredRequests?.length || 0}
-        totalRequestsCount={requests?.length || 0}
-        currentFilters={filters}
-      />
+      {/* Same View for All Roles */}
+      <>
+        {/* Search and Filters - For all roles */}
+        <SearchFilters
+          onSearch={handleSearch}
+          onFilterChange={handleFilterChange}
+          onClearFilters={handleClearFilters}
+          onExport={handleExport}
+          userRole={userRole}
+          exportLoading={exportLoading}
+          requestsCount={filteredRequests?.length || 0}
+          totalRequestsCount={requests?.length || 0}
+          currentFilters={filters}
+        />
 
-      {/* Requests Table */}
-      <RequestsTable 
-        requests={filteredRequests || []}
-        userRole={userRole}
-        searchQuery={searchQuery}
-        filters={filters}
-        onRefresh={refetch}
-      />
+        {/* Requests Table - For all roles */}
+        <RequestsTable 
+          requests={filteredRequests || []}
+          userRole={userRole}
+          searchQuery={searchQuery}
+          filters={filters}
+          onRefresh={refetch}
+        />
+      </>
     </div>
   );
 }

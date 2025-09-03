@@ -3,8 +3,8 @@
 
 import { User } from "next-auth";
 import { USER_ROLES } from "@/constants";
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   BarChart3,
@@ -33,8 +33,21 @@ export default function DashboardSidebar({
   onToggleCollapse,
 }: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [loadingRoute, setLoadingRoute] = useState<string | null>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const userRole = user.role;
+
+  // Clear loading state when pathname changes (navigation complete)
+  useEffect(() => {
+    if (loadingRoute && pathname === loadingRoute) {
+      // Add a small delay to ensure smooth transition
+      const timer = setTimeout(() => {
+        setLoadingRoute(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [pathname, loadingRoute]);
 
   const navigationItems = [
     {
@@ -64,8 +77,20 @@ export default function DashboardSidebar({
     setMobileOpen(!mobileOpen);
   };
 
-  const handleNavClick = () => {
+  const handleNavClick = (href: string) => {
     setMobileOpen(false);
+    
+    // Don't navigate if already on the same route
+    if (pathname === href) {
+      return;
+    }
+    
+    // Only show loading for dashboard and request routes
+    if (href === '/dashboard' || href === '/request') {
+      setLoadingRoute(href);
+      router.push(href);
+      // Loading state will be cleared by useEffect when pathname changes
+    }
   };
 
   return (
@@ -136,31 +161,40 @@ export default function DashboardSidebar({
                 const Icon = item.icon;
                 const isActive = pathname === item.href;
                 
+                const isLoading = loadingRoute === item.href;
+                
                 return (
-                  <Link
+                  <button
                     key={item.id}
-                    href={item.href}
-                    onClick={handleNavClick}
+                    onClick={() => handleNavClick(item.href)}
+                    disabled={isLoading}
                     className={`
-                      flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200
+                      w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200
                       ${collapsed ? 'justify-center' : 'justify-start'}
                       ${
                         isActive
                           ? 'bg-yellow-400 text-black font-medium shadow-sm'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                       }
+                      ${isLoading ? 'opacity-80 cursor-not-allowed' : ''}
                     `}
                   >
-                    <Icon className={`
-                      w-5 h-5 flex-shrink-0
-                      ${isActive ? 'text-black' : 'text-gray-500'}
-                    `} />
+                    {isLoading ? (
+                      <div className={`w-5 h-5 flex-shrink-0 border-2 rounded-full animate-spin ${
+                        isActive ? 'border-black border-t-transparent' : 'border-gray-500 border-t-transparent'
+                      }`} />
+                    ) : (
+                      <Icon className={`
+                        w-5 h-5 flex-shrink-0
+                        ${isActive ? 'text-black' : 'text-gray-500'}
+                      `} />
+                    )}
                     {!collapsed && (
                       <span className="font-medium">
-                        {item.label}
+                        {isLoading ? 'Loading...' : item.label}
                       </span>
                     )}
-                  </Link>
+                  </button>
                 );
               })}
           </nav>

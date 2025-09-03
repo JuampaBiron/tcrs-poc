@@ -77,6 +77,11 @@ export interface Request {
   po?: string
   currency?: string
   approverStatus?: RequestStatus
+  assignedApprover?: string
+  createdDate?: string | Date
+  // Additional fields for approver view
+  tcrsCompany?: boolean
+  blobUrl?: string
   approvedDate?: Date | null
   glCodingCount?: number
 }
