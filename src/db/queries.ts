@@ -346,7 +346,7 @@ export async function findApproverForRequest(company: string, branch: string, am
     console.log('************ searching company:', company, typeof company);
     console.log('************ searching branch:', branch, typeof branch);
     console.log('************ searching amount:', amount, typeof amount);
-    console.log('************ Found approver:', approver);
+    //console.log('************ Found approver:', approver);
     
   return approver[0]?.emailAddress || null;
 }
@@ -399,7 +399,6 @@ export async function createRequestInDatabase(data: {
     await trackRequestCreated(tx, requestId, requester);
 
     await tx.insert(invoiceData).values({
-      invoiceId: createId(),
       requestId,
       company: invoiceFormData.company,
       tcrsCompany: invoiceFormData.tcrsCompany,
@@ -539,6 +538,66 @@ export async function getMyRequestsWithDetails(userEmail: string) {
     .orderBy(desc(approvalRequests.createdDate));
   console.log("🔎 [getMyRequestsWithDetails] user:", userEmail, "rows:", rows);
 
+  return rows;
+}
+
+// Enhanced query for requests table with all required fields and GL coding count
+export async function getRequestsTableData(params: {
+  userEmail?: string
+  userRole?: UserRole
+}) {
+  const glCodingSubquery = db
+    .select({
+      requestId: glCodingUploadedData.requestId,
+      glCodingCount: count(glCodingData.glCodingId).as('gl_coding_count')
+    })
+    .from(glCodingUploadedData)
+    .leftJoin(glCodingData, eq(glCodingUploadedData.uploadId, glCodingData.uploadId))
+    .groupBy(glCodingUploadedData.requestId)
+    .as('gl_counts');
+
+  // Build the base query
+  const baseQuery = db
+    .select({
+      requestId: approvalRequests.requestId,
+      requester: approvalRequests.requester,
+      assignedApprover: approvalRequests.assignedApprover,
+      approverStatus: approvalRequests.approverStatus,
+      approvedDate: approvalRequests.approvedDate,
+      requestCreatedDate: approvalRequests.createdDate,
+      // Invoice data fields
+      company: invoiceData.company,
+      branch: invoiceData.branch,
+      vendor: invoiceData.vendor,
+      po: invoiceData.po,
+      amount: invoiceData.amount,
+      currency: invoiceData.currency,
+      createdDate: invoiceData.createdDate,
+      // GL coding count
+      glCodingCount: sql<number>`COALESCE(${glCodingSubquery.glCodingCount}, 0)`
+    })
+    .from(approvalRequests)
+    .leftJoin(invoiceData, eq(approvalRequests.requestId, invoiceData.requestId))
+    .leftJoin(glCodingSubquery, eq(approvalRequests.requestId, glCodingSubquery.requestId));
+
+  // Apply role-based filtering
+  if (params.userEmail && params.userRole) {
+    if (params.userRole === USER_ROLES.REQUESTER) {
+      const rows = await baseQuery
+        .where(eq(approvalRequests.requester, params.userEmail))
+        .orderBy(desc(approvalRequests.createdDate));
+      return rows;
+    } else if (params.userRole === USER_ROLES.APPROVER) {
+      const rows = await baseQuery
+        .where(eq(approvalRequests.assignedApprover, params.userEmail))
+        .orderBy(desc(approvalRequests.createdDate));
+      return rows;
+    }
+    // Admin sees all requests (no filter)
+  }
+
+  const rows = await baseQuery.orderBy(desc(approvalRequests.createdDate));
+  
   return rows;
 }
 

@@ -77,8 +77,7 @@ CREATE TABLE "gl_coding_uploaded_data" (
 );
 --> statement-breakpoint
 CREATE TABLE "invoice_data" (
-	"invoice_id" varchar(255) PRIMARY KEY NOT NULL,
-	"request_id" varchar(255) NOT NULL,
+	"request_id" varchar(255) PRIMARY KEY NOT NULL,
 	"company" varchar(255),
 	"tcrs_company" boolean,
 	"branch" varchar(255),
@@ -89,8 +88,7 @@ CREATE TABLE "invoice_data" (
 	"approver" varchar(255),
 	"blob_url" varchar(500),
 	"created_date" timestamp DEFAULT now(),
-	"modified_date" timestamp,
-	CONSTRAINT "invoice_data_request_id_unique" UNIQUE("request_id")
+	"modified_date" timestamp
 );
 --> statement-breakpoint
 CREATE TABLE "session" (

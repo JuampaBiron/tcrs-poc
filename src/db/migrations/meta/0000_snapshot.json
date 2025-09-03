@@ -1,5 +1,5 @@
 {
-  "id": "1a275c10-cef9-43b3-84ef-38e7e653bcc4",
+  "id": "2818fa7b-4394-44c2-90ba-24671430d632",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -451,16 +451,10 @@
       "name": "invoice_data",
       "schema": "",
       "columns": {
-        "invoice_id": {
-          "name": "invoice_id",
-          "type": "varchar(255)",
-          "primaryKey": true,
-          "notNull": true
-        },
         "request_id": {
           "name": "request_id",
           "type": "varchar(255)",
-          "primaryKey": false,
+          "primaryKey": true,
           "notNull": true
         },
         "company": {
@@ -534,15 +528,7 @@
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "invoice_data_request_id_unique": {
-          "name": "invoice_data_request_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "request_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

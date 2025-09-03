@@ -44,10 +44,15 @@ export default function RequestsTable({
   const sortedAndFilteredRequests = useMemo(() => {
     // 1. Filtrar los datos primero
     const filtered = requests.filter(request => {
-      const matchesSearch = request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          request.requester?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = searchQuery === '' || 
+        request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.requester?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.company?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.vendor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        request.po?.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = !filters.status || request.status === filters.status;
-      return matchesSearch && matchesStatus;
+      const matchesBranch = !filters.branch || request.branch === filters.branch;
+      return matchesSearch && matchesStatus && matchesBranch;
     });
 
     // 2. Ordenar los datos filtrados
@@ -108,18 +113,60 @@ export default function RequestsTable({
   return (
     <div className="bg-white rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900">All Requests</h3>
-        <p className="text-sm text-gray-600 mt-1">A complete view</p>
+        <h3 className="text-lg font-semibold text-gray-900">Requests Overview</h3>
+        <p className="text-sm text-gray-600 mt-1">Complete request details with invoice data and GL coding information</p>
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('title')}>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('company')}>
                 <div className="flex items-center">
-                  Request Title
-                  {getSortIcon('title')}
+                  Company
+                  {getSortIcon('company')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('branch')}>
+                <div className="flex items-center">
+                  Branch
+                  {getSortIcon('branch')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('vendor')}>
+                <div className="flex items-center">
+                  Vendor
+                  {getSortIcon('vendor')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('po')}>
+                <div className="flex items-center">
+                  PO
+                  {getSortIcon('po')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('amount')}>
+                <div className="flex items-center">
+                  Amount
+                  {getSortIcon('amount')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('currency')}>
+                <div className="flex items-center">
+                  Currency
+                  {getSortIcon('currency')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('submittedOn')}>
+                <div className="flex items-center">
+                  Submitted On
+                  {getSortIcon('submittedOn')}
+                </div>
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('glCodingCount')}>
+                <div className="flex items-center">
+                  GL Coding Count
+                  {getSortIcon('glCodingCount')}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('status')}>
@@ -128,16 +175,10 @@ export default function RequestsTable({
                   {getSortIcon('status')}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('requester')}>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('approvedDate')}>
                 <div className="flex items-center">
-                  Requester
-                  {getSortIcon('requester')}
-                </div>
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('submittedOn')}>
-                <div className="flex items-center">
-                  Submitted On
-                  {getSortIcon('submittedOn')}
+                  Approved Date
+                  {getSortIcon('approvedDate')}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -148,16 +189,26 @@ export default function RequestsTable({
           <tbody className="bg-white divide-y divide-gray-200">
             {sortedAndFilteredRequests.map((request) => (
               <tr key={request.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div className="text-sm font-medium text-gray-900">{request.title}</div>
-                </td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.company || 'Unknown'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.branch || 'Unknown'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.vendor || 'Unknown'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.po || 'N/A'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.amount || '0'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.currency || 'N/A'}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.submittedOn}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.glCodingCount || 0}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
                     {getStatusText(request.status)}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-sm text-gray-900">{request.requester || 'Unknown'}</td>
-                <td className="px-6 py-4 text-sm text-gray-900">{request.submittedOn}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">
+                  {request.approvedDate ? new Date(request.approvedDate).toLocaleDateString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    year: '2-digit'
+                  }) : 'N/A'}
+                </td>
                 <td className="px-6 py-4">
                   <button className="flex items-center space-x-1 px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors">
                     <Eye size={14} />

@@ -43,15 +43,22 @@ userRole?: 'requester' | 'approver' | 'admin'  // ❌ Don't define types inline
 - ALL TypeScript types: Derive from constants using `typeof USER_ROLES[keyof typeof USER_ROLES]`
 
 ### 2. Component Size Limits
-- **Maximum 200 - 250 lines per component**
+- **Maximum 100 lines per component** (strictly enforced)
 - If larger, split into smaller components
 - Use custom hooks for complex logic
+- Keep components focused on single responsibility
 
 ### 3. Security Rules
 - **NO hardcoded domains, emails, or secrets**
 - All security configs must be in environment variables
 - Server-side validation ONLY for roles/permissions
 - Use `isValidUserRole()` and `isValidRequestStatus()` from constants
+
+### 4. Data Fetching & API Rules
+- **NO** direct API calls in components. Use custom hooks from `/src/hooks` and centralized API client in `/src/lib/api-client`
+- **NEVER** fetch data directly in components; always use hooks (e.g., `useDashboardData`)
+- **NO** inline type definitions for roles/statuses
+- **NO** deep relative imports (`../../../`). Use absolute imports from `@/`
 
 ## Development Commands
 
@@ -69,19 +76,27 @@ userRole?: 'requester' | 'approver' | 'admin'  // ❌ Don't define types inline
 - `npm run db:reset` - Full database reset (generate, migrate, seed)
 - `npm run db:push` - Push schema changes to database
 
-## 🏗️ MANDATORY Folder Structure
+## 🏗️ MANDATORY Project Architecture & Folder Structure
 
+### Technology Stack
+- **Frontend:** Next.js 15 App Router (TypeScript, Tailwind CSS)
+- **Backend:** Next.js API Routes (see `src/app/api/`)
+- **Database:** Neon PostgreSQL, accessed via Drizzle ORM (`src/db/`)
+- **Authentication:** NextAuth.js 5 with Microsoft Entra ID (`src/auth.ts`)
+
+### Folder Structure
 ```
 src/
 ├── components/
-│   ├── ui/              # Reusable UI components (LoadingSpinner, ErrorMessage, StatusBadge)
+│   ├── ui/              # Reusable UI primitives (LoadingSpinner, ErrorMessage, StatusBadge)
 │   ├── auth/            # Authentication components (SignInButton, LoginRedirect, etc.)
 │   ├── common/          # Cross-domain shared components (FinningLogo, SignOutButton)
 │   └── dashboard/       # Dashboard-specific business components
-├── constants/           # ALL constants, roles, statuses, validation functions
-├── types/               # Shared TypeScript interfaces and types
+├── constants/           # ALL constants, roles, statuses, validation functions (SINGLE SOURCE OF TRUTH)
+├── types/               # Shared TypeScript interfaces and types (derive from constants)
 ├── lib/                 # Utilities (auth-utils, api-client, error-handler)
 ├── hooks/               # Custom React hooks (useDashboardData)
+├── db/                  # Database schema, queries, and migrations
 └── app/                 # Next.js App Router pages and API routes
 ```
 
@@ -281,7 +296,7 @@ if (error) return <ErrorMessage message={error} onRetry={refetch} />
 ## 🚀 Performance Requirements
 
 ### Component Performance
-- Components must be under 100 lines
+- Components must be under 100 lines (strictly enforced)
 - Use `useCallback` for functions passed as props
 - Use `useMemo` for expensive calculations
 - Implement proper dependency arrays
@@ -290,6 +305,19 @@ if (error) return <ErrorMessage message={error} onRetry={refetch} />
 - Import only needed utilities
 - Use dynamic imports for large components
 - Keep components small and focused
+
+## 🎨 UI/UX & Performance Guidelines
+
+### Centralized UI Components
+- Use centralized UI components for status, loading, and error states
+- All UI primitives should be in `src/components/ui/`
+- Maintain consistent styling and behavior across the application
+
+### Performance Optimization
+- Keep components under 100 lines; split if larger
+- Use `useCallback`/`useMemo` for performance optimization
+- Use dynamic imports for large components when needed
+- Implement proper loading and error states
 
 ## ✅ Quality Assurance
 
@@ -306,7 +334,7 @@ if (error) return <ErrorMessage message={error} onRetry={refetch} />
 
 ## 🚫 FORBIDDEN Practices
 
-### Constants & Types
+### Constants & Types (CRITICAL)
 - ❌ Hardcoded roles: `'admin'`, `'pending'`, `'requester'`, `'approver'`, etc.
 - ❌ Hardcoded status: `'approved'`, `'rejected'`, `'in-review'`, etc.  
 - ❌ Inline type definitions: `userRole?: 'requester' | 'approver'`
@@ -314,18 +342,26 @@ if (error) return <ErrorMessage message={error} onRetry={refetch} />
 - ❌ Comparing with strings: `userRole === 'admin'`
 - ❌ Default string values: `userRole = 'requester'`
 
-### Code Structure
+### Code Structure & Architecture
 - ❌ Components over 100 lines
 - ❌ Direct API calls in components
 - ❌ `window.location.reload()` for updates
 - ❌ Unhandled errors or silent failures
 - ❌ Mixed folder organization
 - ❌ Deep relative imports (`../../../`)
+- ❌ Creating components outside the defined folder structure
 
-### Security  
+### Security & Configuration
 - ❌ Hardcoded security values
 - ❌ Client-side role authorization
 - ❌ Hardcoded domains or emails
+- ❌ Committing secrets or configuration to repository
+
+### Data Fetching & API
+- ❌ Direct fetch calls in components
+- ❌ Bypassing the centralized API client
+- ❌ Not using custom hooks for data fetching
+- ❌ Silent failures in API calls
 
 ## 💡 Quick Reference
 

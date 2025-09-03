@@ -117,9 +117,9 @@ export default function RequestDetailsModal({
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6">
             {[
-              { id: 'overview', label: 'Overview', icon: FileText },
-              { id: 'gl-coding', label: 'GL Coding', icon: DollarSign },
-              { id: 'documents', label: 'Documents', icon: FileText }
+              { id: 'overview' as const, label: 'Overview', icon: FileText },
+              { id: 'gl-coding' as const, label: 'GL Coding', icon: DollarSign },
+              { id: 'documents' as const, label: 'Documents', icon: FileText }
             ].map((tab) => (
               <button
                 key={tab.id}

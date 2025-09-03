@@ -40,9 +40,30 @@ export interface UserContext {
   groups?: string[] // Nuevo: incluir groups en contexto
 }
 
-// Resto de tipos existentes permanecen igual...
+// Enhanced Request interface for the requests table
+export interface RequestTableData {
+  requestId: string
+  requester: string | null
+  assignedApprover: string | null
+  approverStatus: RequestStatus | null
+  approvedDate: Date | null
+  requestCreatedDate: Date | null
+  // Invoice data fields
+  company: string | null
+  branch: string | null
+  vendor: string | null
+  po: string | null
+  amount: string | null
+  currency: string | null
+  createdDate: Date | null // Submitted on date from invoice_data
+  // GL coding count
+  glCodingCount: number
+}
+
+// Enhanced Request interface with new fields
 export interface Request {
   id: string
+  requestId?: string
   title: string
   status: RequestStatus
   reviewer: string
@@ -50,6 +71,14 @@ export interface Request {
   submittedOn: string
   amount?: string
   branch: string
+  // New enhanced fields
+  company?: string
+  vendor?: string
+  po?: string
+  currency?: string
+  approverStatus?: RequestStatus
+  approvedDate?: Date | null
+  glCodingCount?: number
 }
 
 export interface Stats {

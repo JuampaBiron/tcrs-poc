@@ -58,8 +58,7 @@ export const verificationTokens = pgTable(
 
 // Invoice Data Table
 export const invoiceData = pgTable('invoice_data', {
-  invoiceId: varchar('invoice_id', { length: 255 }).primaryKey().$defaultFn(() => createId()),
-  requestId: varchar('request_id', { length: 255 }).notNull().unique(),
+  requestId: varchar('request_id', { length: 255 }).primaryKey(),
   company: varchar('company', { length: 255 }),
   tcrsCompany: boolean('tcrs_company'),
   branch: varchar('branch', { length: 255 }),

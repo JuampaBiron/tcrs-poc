@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from "@/auth"
 import { getUserRole } from "@/lib/auth-utils"
-import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
+import { getRequestsByUser, getRequestsByApprover, getAllRequests, getRequestsTableData } from '@/db/queries'
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
 import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
 
@@ -51,26 +51,17 @@ export async function GET(request: NextRequest) {
       }, { status: 403 })
     }
 
-    let requests
-    
-    switch (role) {
-      case USER_ROLES.REQUESTER:
-        requests = await getRequestsByUser(email)
-        break
-      case USER_ROLES.APPROVER:
-        requests = await getRequestsByApprover(email)
-        break
-      case USER_ROLES.ADMIN:
-        requests = await getAllRequests()
-        break
-      default:
-        throw new ValidationError('Invalid role')
-    }
+    // Use the enhanced query that includes invoice data and GL coding count
+    const requests = await getRequestsTableData({
+      userEmail: email,
+      userRole: role as any // Cast to UserRole type
+    })
 
-    // Transform data for frontend
+    // Transform data for frontend with enhanced fields
     const transformedRequests = requests.map(req => ({
       id: req.requestId,
-      title: req.comments || 'No description',
+      requestId: req.requestId,
+      title: `${req.vendor || 'Unknown Vendor'} - ${req.currency || ''} ${req.amount || '0'}`,
       status: req.approverStatus || REQUEST_STATUS.PENDING,
       reviewer: req.assignedApprover || 'Unassigned',
       requester: req.requester || 'Unknown',
@@ -79,8 +70,16 @@ export async function GET(request: NextRequest) {
         day: '2-digit', 
         year: '2-digit'
       }) : 'Unknown',
-      branch: extractBranch(req.comments || ''),
-      amount: extractAmount(req.comments || '')
+      // Enhanced fields from joined tables
+      company: req.company || 'Unknown',
+      branch: req.branch || 'Unknown',
+      vendor: req.vendor || 'Unknown',
+      po: req.po || 'N/A',
+      amount: req.amount || '0',
+      currency: req.currency || '',
+      approverStatus: req.approverStatus || REQUEST_STATUS.PENDING,
+      approvedDate: req.approvedDate,
+      glCodingCount: req.glCodingCount || 0
     }))
 
     return createSuccessResponse({ requests: transformedRequests })

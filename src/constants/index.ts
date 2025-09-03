@@ -74,6 +74,7 @@ export const ERROR_MESSAGES = {
   UNAUTHORIZED: 'You are not authorized to perform this action.',
   NOT_AUTHENTICATED: 'Please log in to continue.',
   SESSION_EXPIRED: 'Your session has expired. Please log in again.',
+  NOT_FOUND: 'The requested resource was not found.',
   
   // Validation errors
   VALIDATION: 'Invalid data provided. Please check your input.',
@@ -256,6 +257,11 @@ export const isValidCompany = (
   return VALID_COMPANIES.includes(company as any);
 };
 export const DICTIONARY_FALLBACKS = {
+  companies: [
+    { code: COMPANIES.TCRS, description: "TCRS" },
+    { code: COMPANIES.SITECH, description: "Sitech" },
+    { code: COMPANIES.FUSED_CA, description: "Fused CA" },
+  ],
   currencies: [
     { code: CURRENCIES.CAD, name: "Canadian Dollar" },
     { code: CURRENCIES.USD, name: "US Dollar" },
