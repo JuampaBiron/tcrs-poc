@@ -106,21 +106,22 @@ export default function DashboardSidebar({
       {/* Mobile Overlay */}
       {mobileOpen && (
         <div 
-          className="lg:hidden fixed inset-0 bg-black/20 z-40"
+          className="lg:hidden fixed inset-0 bg-gradient-to-r from-black/30 via-black/20 to-black/10 backdrop-blur-sm z-40"
           onClick={() => setMobileOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <div className={`
-        fixed left-0 top-0 h-full bg-white border-r border-gray-100 z-40
+        fixed left-0 top-0 h-full bg-gradient-to-b from-white via-gray-50/30 to-gray-100/20 z-40
         transition-all duration-300 ease-in-out flex flex-col
+        shadow-xl shadow-gray-900/10
         ${collapsed ? 'w-20' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Header Section */}
-        <div className={`flex-shrink-0 py-8 border-b border-gray-50 ${collapsed ? 'px-2' : 'px-6'}`}>
+        <div className={`flex-shrink-0 py-8 border-b border-gray-100/60 bg-gradient-to-r from-transparent via-white/40 to-transparent ${collapsed ? 'px-2' : 'px-6'}`}>
           {!collapsed ? (
             <>
               {/* Logo */}
@@ -135,10 +136,10 @@ export default function DashboardSidebar({
               
               {/* Title */}
               <div className="text-center">
-                <h1 className="text-lg font-semibold text-gray-900 mb-1">
-                  TCRS Approval
+                <h1 className="text-xl font-bold text-gray-900 mb-1 tracking-wide">
+                  TCRS APPROVAL
                 </h1>
-                <p className="text-sm text-gray-500">System</p>
+                <p className="text-sm font-medium text-gray-600 tracking-wider uppercase">System</p>
               </div>
             </>
           ) : (
@@ -153,7 +154,7 @@ export default function DashboardSidebar({
         </div>
 
         {/* Navigation Section */}
-        <div className="flex-1 px-4 py-6">
+        <div className="flex-1 px-4 py-6 bg-gradient-to-b from-transparent via-white/20 to-transparent">
           <nav className="space-y-2">
             {navigationItems
               .filter(item => item.available)
@@ -173,7 +174,7 @@ export default function DashboardSidebar({
                       ${collapsed ? 'justify-center' : 'justify-start'}
                       ${
                         isActive
-                          ? 'bg-yellow-400 text-black font-medium shadow-sm'
+                          ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-medium shadow-lg shadow-yellow-500/25'
                           : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50/50 hover:shadow-sm'
                       }
                       ${isLoading ? 'opacity-80 cursor-not-allowed' : ''}
@@ -190,7 +191,7 @@ export default function DashboardSidebar({
                       `} />
                     )}
                     {!collapsed && (
-                      <span className="font-medium">
+                      <span className="font-semibold text-sm tracking-wide">
                         {isLoading ? 'Loading...' : item.label}
                       </span>
                     )}
@@ -201,7 +202,7 @@ export default function DashboardSidebar({
         </div>
 
         {/* Collapse Button */}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-gray-50">
+        <div className="flex-shrink-0 px-4 py-4 border-t border-gray-100/60 bg-gradient-to-r from-transparent via-white/30 to-transparent">
           <button
             onClick={onToggleCollapse}
             className="hidden lg:flex items-center justify-center w-full h-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg transition-all duration-200 hover:shadow-sm"
@@ -211,58 +212,77 @@ export default function DashboardSidebar({
             ) : (
               <div className="flex items-center gap-2">
                 <ChevronLeft className="w-4 h-4" />
-                <span className="text-sm font-medium">Collapse</span>
+                <span className="text-xs font-semibold tracking-wide uppercase">Collapse</span>
               </div>
             )}
           </button>
         </div>
 
         {/* User Section */}
-        <div className={`flex-shrink-0 border-t border-gray-100 ${collapsed ? 'p-2' : 'p-4'}`}>
-          {!collapsed ? (
-            <div className="space-y-4">
-              {/* User Info */}
-              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold">
+        <div className={`flex-shrink-0 border-t border-gray-100/60 bg-gradient-to-b from-gray-50/20 to-gray-100/30 ${collapsed ? 'p-2' : 'p-4'}`}>
+          <div className="relative h-36">
+            {/* Expanded State */}
+            <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
+              collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+            }`}>
+              <div className="h-full flex flex-col justify-between py-1">
+                {/* User Info */}
+                <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-white via-gray-50 to-gray-100/70 rounded-lg shadow-sm border border-gray-200/40">
+                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-semibold shadow-md">
+                    {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+                      {user.name}
+                    </p>
+                    <p className="text-xs font-medium text-gray-600 truncate leading-relaxed">
+                      {user.email}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Role Badge */}
+                <div className="flex justify-center">
+                  <span className="inline-flex items-center px-3 py-1 text-xs font-bold text-yellow-800 bg-gradient-to-r from-yellow-100 to-yellow-50 rounded-full border border-yellow-200 shadow-sm tracking-wider uppercase">
+                    {userRole}
+                  </span>
+                </div>
+
+                {/* Sign Out Button */}
+                <div className="flex justify-center">
+                  <SignOutButton 
+                    variant="sidebar" 
+                    collapsed={false} 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Collapsed State */}
+            <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
+              collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+            }`}>
+              <div className="h-full flex flex-col justify-between items-center py-1">
+                {/* Collapsed User Avatar */}
+                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-bold text-sm shadow-md">
                   {user.name?.charAt(0)?.toUpperCase() || 'U'}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {user.name}
-                  </p>
-                  <p className="text-xs text-gray-500 truncate">
-                    {user.email}
-                  </p>
+                
+                {/* Collapsed Role Badge */}
+                <div className="w-8 h-8 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center border border-yellow-300/50 shadow-sm">
+                  <span className="text-[8px] font-bold text-yellow-800 uppercase">
+                    {userRole.charAt(0)}
+                  </span>
                 </div>
+                
+                {/* Collapsed Sign Out */}
+                <SignOutButton 
+                  variant="icon" 
+                  collapsed={true} 
+                />
               </div>
-
-              {/* Role Badge */}
-              <div className="flex justify-center">
-                <span className="inline-flex items-center px-3 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full border border-yellow-200">
-                  {userRole}
-                </span>
-              </div>
-
-              {/* ✅ FIXED: Sign Out Button con funcionalidad */}
-              <SignOutButton 
-                variant="sidebar" 
-                collapsed={false} 
-              />
             </div>
-          ) : (
-            <div className="flex flex-col items-center space-y-3">
-              {/* Collapsed User Avatar */}
-              <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold text-sm">
-                {user.name?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
-              
-              {/* ✅ FIXED: Collapsed Sign Out con funcionalidad */}
-              <SignOutButton 
-                variant="icon" 
-                collapsed={true} 
-              />
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </>
