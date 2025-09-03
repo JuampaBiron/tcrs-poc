@@ -297,7 +297,7 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
 
       {/* Form steps */}
       {!showSelector && !success && (
-        <div className="max-w-1xl mx-auto bg-white rounded-lg border border-gray-200 p-6 space-y-6">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
           {/* Progress Indicator */}
           <ProgressIndicator currentStep={currentStep} />
 

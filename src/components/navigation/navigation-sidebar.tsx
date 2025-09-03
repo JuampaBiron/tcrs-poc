@@ -98,7 +98,7 @@ export default function DashboardSidebar({
       {/* Mobile Menu Button */}
       <button
         onClick={toggleMobile}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg hover:bg-blue-50/50 hover:border-blue-200 transition-all duration-200"
       >
         {mobileOpen ? <X className="w-6 h-6 text-gray-600" /> : <Menu className="w-6 h-6 text-gray-600" />}
       </button>
@@ -115,12 +115,12 @@ export default function DashboardSidebar({
       <div className={`
         fixed left-0 top-0 h-full bg-white border-r border-gray-100 z-40
         transition-all duration-300 ease-in-out flex flex-col
-        ${collapsed ? 'w-16' : 'w-72'}
+        ${collapsed ? 'w-20' : 'w-72'}
         ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         
         {/* Header Section */}
-        <div className="flex-shrink-0 px-6 py-8 border-b border-gray-50">
+        <div className={`flex-shrink-0 py-8 border-b border-gray-50 ${collapsed ? 'px-2' : 'px-6'}`}>
           {!collapsed ? (
             <>
               {/* Logo */}
@@ -142,11 +142,11 @@ export default function DashboardSidebar({
               </div>
             </>
           ) : (
-            <div className="flex justify-center">
+            <div className="flex justify-center py-2">
               <img
-                src="/finning-cat-logo.png"
-                alt="Finning CAT Logo"
-                className="h-6 w-6 object-contain"
+                src="/finningF.png"
+                alt="Finning F"
+                className="h-16 w-16 object-contain"
               />
             </div>
           )}
@@ -174,7 +174,7 @@ export default function DashboardSidebar({
                       ${
                         isActive
                           ? 'bg-yellow-400 text-black font-medium shadow-sm'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                          : 'text-gray-600 hover:text-blue-600 hover:bg-blue-50/50 hover:shadow-sm'
                       }
                       ${isLoading ? 'opacity-80 cursor-not-allowed' : ''}
                     `}
@@ -204,7 +204,7 @@ export default function DashboardSidebar({
         <div className="flex-shrink-0 px-4 py-4 border-t border-gray-50">
           <button
             onClick={onToggleCollapse}
-            className="hidden lg:flex items-center justify-center w-full h-10 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+            className="hidden lg:flex items-center justify-center w-full h-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg transition-all duration-200 hover:shadow-sm"
           >
             {collapsed ? (
               <ChevronRight className="w-4 h-4" />
@@ -218,7 +218,7 @@ export default function DashboardSidebar({
         </div>
 
         {/* User Section */}
-        <div className="flex-shrink-0 p-4 border-t border-gray-100">
+        <div className={`flex-shrink-0 border-t border-gray-100 ${collapsed ? 'p-2' : 'p-4'}`}>
           {!collapsed ? (
             <div className="space-y-4">
               {/* User Info */}
@@ -252,7 +252,7 @@ export default function DashboardSidebar({
           ) : (
             <div className="flex flex-col items-center space-y-3">
               {/* Collapsed User Avatar */}
-              <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold text-xs">
+              <div className="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center text-black font-semibold text-sm">
                 {user.name?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               
