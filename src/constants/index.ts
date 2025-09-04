@@ -41,7 +41,7 @@ export const API_ROUTES = {
   AUTH: "/api/auth",
   DICTIONARIES: "/api/dictionaries",
   UPLOAD_PDF: "/api/invoices/upload-pdf",
-  UPLOAD_EXCEL: "/api/gl-coding/upload-excel",  // ✅ ADDED: Nueva ruta Excel
+  UPLOAD_EXCEL: "/api/invoices/upload-excel",  // ✅ FIXED: Correct path
 } as const;
 
 // Azure Blob Storage constants

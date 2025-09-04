@@ -77,7 +77,12 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
 
       if (data.excelFile) {
         console.log('🔄 Uploading Excel to Azure before proceeding...');
-        const result = await uploadExcel(data.excelFile, 'temp');
+        const result = await uploadExcel(
+          data.excelFile, 
+          'temp',
+          invoiceData?.company,
+          invoiceData?.branch
+        );
         setExcelUploadResult(result);
         console.log('✅ Excel uploaded successfully:', result.blobUrl);
       } else {
@@ -132,9 +137,16 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
         />
       );
     }
-    if (invoiceData.pdfFile) {
+    // Check if PDF was already uploaded as temporary, otherwise upload it now
+    if (invoiceData.pdfFile && !invoiceData.pdfUrl) {
       try {
-        pdfUploadResult = await uploadPdf(invoiceData.pdfFile, 'direct');
+        console.log('🔄 PDF not yet uploaded, uploading as temporary...');
+        pdfUploadResult = await uploadPdf(
+          invoiceData.pdfFile, 
+          'temp',
+          invoiceData.company,
+          invoiceData.branch
+        );
         if (!pdfUploadResult.blobName || !pdfUploadResult.tempId || !pdfUploadResult.blobUrl) {
           throw new Error(ERROR_MESSAGES.BLOB_NAME_MISSING);
         }
@@ -142,6 +154,15 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
         setError(`PDF upload failed: ${pdfErr instanceof Error ? pdfErr.message : ERROR_MESSAGES.GENERIC}`);
         return;
       }
+    } else if (invoiceData.pdfUrl) {
+      console.log('✅ PDF already uploaded as temporary, using existing upload');
+      // Use existing upload data
+      pdfUploadResult = {
+        blobUrl: invoiceData.pdfUrl,
+        tempId: invoiceData.pdfTempId,
+        blobName: invoiceData.blobName,
+        originalFileName: invoiceData.pdfOriginalName || invoiceData.pdfFile?.name
+      };
     }
 
     const requestData = {
@@ -309,6 +330,9 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
             <InvoiceForm 
               onSubmit={handleInvoiceSubmit} 
               initialData={invoiceData ?? undefined}
+              uploadPdf={uploadPdf}
+              pdfUploading={pdfUploading}
+              pdfError={pdfError}
             />
           )}
           {/* Back to selector button */}

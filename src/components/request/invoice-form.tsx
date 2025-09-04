@@ -18,11 +18,18 @@ interface InvoiceData {
   amount: number;
   currency: string;
   pdfFile?: File;
+  pdfUrl?: string;
+  pdfTempId?: string;
+  pdfOriginalName?: string;
+  blobName?: string;
 }
 
 interface InvoiceFormProps {
   onSubmit: (data: InvoiceData) => void;
   initialData?: Partial<InvoiceData>;
+  uploadPdf?: (file: File, context?: string, company?: string, branch?: string) => Promise<any>;
+  pdfUploading?: boolean;
+  pdfError?: string | null;
 }
 
 interface DictionaryItem {
@@ -35,7 +42,7 @@ interface CurrencyItem {
   name: string;
 }
 
-export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps) {
+export default function InvoiceForm({ onSubmit, initialData, uploadPdf, pdfUploading, pdfError }: InvoiceFormProps) {
   const [formData, setFormData] = useState<InvoiceData>({
     company: initialData?.company || '',
     branch: initialData?.branch || '',
@@ -51,6 +58,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [pdfUploadResult, setPdfUploadResult] = useState<any>(null);
 
   // Usar hook para obtener companies (sin fallback)
   const { data: companies, isLoading: loadingCompanies, error: companiesError } = useCompanies();
@@ -86,11 +94,38 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     }
   };
 
-  const handleFileUpload = (file: File) => {
-    if (file.type === 'application/pdf') {
-      handleInputChange('pdfFile', file);
-    } else {
+  const handleFileUpload = async (file: File) => {
+    if (file.type !== 'application/pdf') {
       setError('Please upload a PDF file');
+      return;
+    }
+
+    // Store file locally first
+    handleInputChange('pdfFile', file);
+
+    // Upload to Azure if uploadPdf function is provided and company/branch are selected
+    if (uploadPdf && formData.company && formData.branch) {
+      try {
+        console.log('🔄 Uploading PDF as temporary...');
+        const result = await uploadPdf(file, 'temp', formData.company, formData.branch);
+        setPdfUploadResult(result);
+        
+        // Update form data with upload result
+        setFormData(prev => ({
+          ...prev,
+          pdfUrl: result.blobUrl,
+          pdfTempId: result.tempId,
+          pdfOriginalName: result.originalFileName,
+          blobName: result.blobName
+        }));
+
+        console.log('✅ PDF uploaded successfully as temporary:', result.blobUrl);
+      } catch (uploadError) {
+        console.error('❌ PDF temporary upload failed:', uploadError);
+        // Don't prevent form submission, keep file locally
+      }
+    } else if (uploadPdf) {
+      console.log('⚠️ PDF file selected but company/branch not set, will upload later');
     }
   };
 
@@ -149,7 +184,7 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
     <div className="bg-white rounded-lg border border-gray-200 p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-6">Invoice Information</h3>
 
-      {error && <ErrorMessage message={error} />}
+      {(error || pdfError) && <ErrorMessage message={error || pdfError || ''} />}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Company and Branch Selection (Cascade) */}
@@ -318,13 +353,24 @@ export default function InvoiceForm({ onSubmit, initialData }: InvoiceFormProps)
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
           >
-            {formData.pdfFile ? (
+            {pdfUploading ? (
+              <div className="flex items-center justify-center space-x-2">
+                <LoadingSpinner size="sm" />
+                <span className="text-sm text-gray-600">Uploading PDF...</span>
+              </div>
+            ) : formData.pdfFile ? (
               <div className="flex items-center justify-center space-x-2">
                 <FileText className="w-5 h-5 text-green-600" />
                 <span className="text-sm text-gray-700">{formData.pdfFile.name}</span>
+                {pdfUploadResult && (
+                  <span className="text-xs text-green-600">✓ Uploaded</span>
+                )}
                 <button
                   type="button"
-                  onClick={() => handleInputChange('pdfFile', undefined)}
+                  onClick={() => {
+                    handleInputChange('pdfFile', undefined);
+                    setPdfUploadResult(null);
+                  }}
                   className="text-red-500 hover:text-red-700"
                 >
                   <X className="w-4 h-4" />

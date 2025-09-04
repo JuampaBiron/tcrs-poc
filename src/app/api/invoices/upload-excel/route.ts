@@ -3,12 +3,13 @@ import { NextRequest } from 'next/server';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler';
 import { FILE_UPLOAD, UPLOAD_ERRORS } from '@/constants';
+import { generateTempBlobPath } from '@/lib/blob-path-generator';
 
 // ✅ CONSISTENT: Inline Azure functions (same pattern as PDF)
 const getBlobServiceClient = () => {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices';
   
   if (!accountName || !accountKey) {
     throw new Error('Azure Storage credentials not configured');
@@ -52,6 +53,10 @@ export async function POST(request: NextRequest) {
     const file = formData.get('excelFile') as File;
     const uploadType = formData.get('uploadType') as string || 'temp';
     const originalFileName = formData.get('originalFileName') as string;
+    const company = formData.get('company') as string || 'finning-ca';
+    const branch = formData.get('branch') as string || 'default';
+    
+    console.log(`📋 Upload parameters - Company: "${company}", Branch: "${branch}"`);
     
     // Validation
     if (!file) {
@@ -60,6 +65,14 @@ export async function POST(request: NextRequest) {
     
     if (!originalFileName) {
       throw new ValidationError('Original filename is required');
+    }
+    
+    if (!company) {
+      throw new ValidationError('Company information is required');
+    }
+    
+    if (!branch) {
+      throw new ValidationError('Branch information is required');
     }
     
     // Validate file type using constants
@@ -72,16 +85,21 @@ export async function POST(request: NextRequest) {
       throw new ValidationError(UPLOAD_ERRORS.FILE_TOO_LARGE);
     }
     
-    // ✅ CONSISTENT: Generate blob-friendly names (same pattern as PDF)
+    // ✅ HIERARCHICAL: Generate hierarchical blob path using new structure
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
     const timestamp = generateBlobFriendlyTimestamp();
     const randomId = Math.random().toString(36).substr(2, 9);
+    const tempId = `TEMP-${timestamp}-${randomId}`;
     const sanitizedFileName = sanitizeFileName(originalFileName);
     
-    // ✅ CONSISTENT: gl-coding path instead of invoices
-    const blobName = `gl-coding/${year}/${month}/TEMP-${timestamp}_${sanitizedFileName}`;
+    // Use new hierarchical structure: temp/{company}/{branch}/{year}/{month}/{tempId}/{fileName}
+    const blobName = generateTempBlobPath({
+      company,
+      branch,
+      fileName: sanitizedFileName,
+      tempId,
+      createdDate: now
+    });
     
     console.log(`📤 Uploading Excel: ${blobName}`);
     
@@ -105,10 +123,10 @@ export async function POST(request: NextRequest) {
         uploadType: uploadType,
         originalFileName: originalFileName,
         uploadedAt: now.toISOString(),
-        tempId: `${timestamp}_${randomId}`,
+        tempId,
         status: 'temporary', // For cleanup
-        year: year.toString(),
-        month: month,
+        company,
+        branch,
         contentType: 'gl-coding',
         purpose: 'gl-coding-data'
       },
@@ -123,10 +141,10 @@ export async function POST(request: NextRequest) {
       blobUrl,
       originalFileName: originalFileName,
       size: file.size,
-      blobName, // ✅ CONSISTENT: Return actual blob name
-      tempId: `${timestamp}_${randomId}`,
-      year: year,
-      month: parseInt(month),
+      blobName, // ✅ HIERARCHICAL: Return hierarchical blob name
+      tempId,
+      company,
+      branch,
     });
     
   } catch (error) {

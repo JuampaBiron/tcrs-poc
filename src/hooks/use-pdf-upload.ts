@@ -13,7 +13,7 @@ interface UploadResult {
 }
 
 interface UsePdfUploadReturn {
-  uploadPdf: (file: File, context?: string) => Promise<UploadResult>; // ← Cambiar requestId por context opcional
+  uploadPdf: (file: File, context?: string, company?: string, branch?: string) => Promise<UploadResult>;
   uploading: boolean;
   error: string | null;
   progress: number;
@@ -29,7 +29,7 @@ export function usePdfUpload(): UsePdfUploadReturn {
     setError(null);
   }, []);
 
-  const uploadPdf = useCallback(async (file: File, context: string = 'direct'): Promise<UploadResult> => {
+  const uploadPdf = useCallback(async (file: File, context: string = 'direct', company?: string, branch?: string): Promise<UploadResult> => {
     setUploading(true);
     setError(null);
     setProgress(0);
@@ -41,7 +41,15 @@ export function usePdfUpload(): UsePdfUploadReturn {
 
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('context', context); // ← CAMBIAR de requestId a context
+      formData.append('context', context);
+      
+      // Add company and branch if provided
+      if (company) {
+        formData.append('company', company);
+      }
+      if (branch) {
+        formData.append('branch', branch);
+      }
 
       console.log('🔄 Uploading PDF to Azure Blob Storage...');
 

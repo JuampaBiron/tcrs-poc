@@ -74,7 +74,8 @@ export const invoiceData = pgTable('invoice_data', {
 
 // Approval Requests Table
 export const approvalRequests = pgTable('approval_requests', {
-  requestId: varchar('request_id', { length: 255 }).primaryKey().$defaultFn(() => createId()),
+  id: varchar('id', { length: 255 }).primaryKey().$defaultFn(() => createId()), // Internal ID for DB operations
+  requestId: varchar('request_id', { length: 255 }).unique().notNull(), // TCRS-YYYY-NNNNNN format (keeping 255 for migration compatibility)
   requester: varchar('requester', { length: 255 }),
   assignedApprover: varchar('assigned_approver', { length: 255 }),
   approverStatus: varchar('approver_status', { length: 50 }).$type<typeof REQUEST_STATUS[keyof typeof REQUEST_STATUS]>(),
@@ -82,7 +83,10 @@ export const approvalRequests = pgTable('approval_requests', {
   comments: varchar('comments', { length: 1000 }),
   createdDate: timestamp('created_date').defaultNow(),
   modifiedDate: timestamp('modified_date'),
-})
+}, (table) => ({
+  // Ensure requestId is unique and indexed for fast lookups
+  requestIdIdx: index('approval_requests_request_id_idx').on(table.requestId),
+}))
 
 // Approver List Table
 export const approverList = pgTable('approver_list',

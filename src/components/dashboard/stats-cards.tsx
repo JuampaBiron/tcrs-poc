@@ -122,33 +122,38 @@ export default function StatsCards({ userRole, stats }: StatsCardsProps) {
     switch (color) {
       case "blue":
         return {
-          bg: "bg-blue-100",
-          text: "text-blue-600",
-          border: "border-blue-200"
+          bg: "bg-gradient-to-br from-blue-50 to-blue-100",
+          text: "text-blue-700",
+          border: "border-blue-200 shadow-blue-100/50",
+          glow: "shadow-lg shadow-blue-200/40"
         };
       case "orange":
         return {
-          bg: "bg-orange-100",
-          text: "text-orange-600",
-          border: "border-orange-200"
+          bg: "bg-gradient-to-br from-orange-50 to-orange-100",
+          text: "text-orange-700",
+          border: "border-orange-200 shadow-orange-100/50",
+          glow: "shadow-lg shadow-orange-200/40"
         };
       case "green":
         return {
-          bg: "bg-green-100",
-          text: "text-green-600",
-          border: "border-green-200"
+          bg: "bg-gradient-to-br from-green-50 to-green-100",
+          text: "text-green-700",
+          border: "border-green-200 shadow-green-100/50",
+          glow: "shadow-lg shadow-green-200/40"
         };
       case "red":
         return {
-          bg: "bg-red-100",
-          text: "text-red-600",
-          border: "border-red-200"
+          bg: "bg-gradient-to-br from-red-50 to-red-100",
+          text: "text-red-700",
+          border: "border-red-200 shadow-red-100/50",
+          glow: "shadow-lg shadow-red-200/40"
         };
       default:
         return {
-          bg: "bg-gray-100",
-          text: "text-gray-600",
-          border: "border-gray-200"
+          bg: "bg-gradient-to-br from-gray-50 to-gray-100",
+          text: "text-gray-700",
+          border: "border-gray-200 shadow-gray-100/50",
+          glow: "shadow-lg shadow-gray-200/40"
         };
     }
   };
@@ -164,17 +169,27 @@ export default function StatsCards({ userRole, stats }: StatsCardsProps) {
         return (
           <div
             key={index}
-            className="bg-white rounded-lg shadow-sm p-6 border hover:shadow-md transition-shadow"
+            className={`bg-gradient-to-br from-white via-gray-50/30 to-gray-100/20 rounded-xl shadow-sm border ${colors.border} p-6 hover:shadow-md hover:scale-[1.02] transition-all duration-300`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className={`text-2xl font-bold ${colors.text} mb-1`}>
+            <div className="flex items-center">
+              {/* Number Section */}
+              <div className="flex-shrink-0">
+                <div className={`text-4xl font-bold ${colors.text}`}>
                   {card.value}
                 </div>
-                <div className="text-sm font-medium text-gray-900 mb-1">{card.title}</div>
-                <div className="text-xs text-gray-500">{card.subtitle}</div>
               </div>
-              <div className={`p-3 ${colors.bg} rounded-lg flex-shrink-0 ml-4`}>
+              
+              {/* Vertical Divider */}
+              <div className={`w-px h-12 bg-gray-300 mx-4`}></div>
+              
+              {/* Text Section */}
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-semibold text-gray-800 mb-1">{card.title}</div>
+                <div className="text-xs text-gray-600 font-medium">{card.subtitle}</div>
+              </div>
+              
+              {/* Icon Section */}
+              <div className={`p-3 ${colors.bg} rounded-xl flex-shrink-0 ml-3 shadow-md border border-white/50`}>
                 <Icon className={`${colors.text} w-6 h-6`} />
               </div>
             </div>

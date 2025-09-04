@@ -1,4 +1,4 @@
-// src/lib/azure-pdf-rename.ts - REFACTORED VERSION USING BLOB-UTILS
+// src/lib/azure-pdf-rename.ts - OPTIMIZED VERSION WITH HIERARCHICAL STRUCTURE
 import {
   getBlobServiceClient,
   getContainerName,
@@ -8,8 +8,10 @@ import {
   copyBlob,
   updateBlobMetadata,
   deleteBlob,
-  validateRenameParameters
+  validateRenameParameters,
+  moveToFinalOptimizedLocation
 } from './blob-utils';
+import { parseBlobPath, convertTempToFinalPath } from './blob-path-generator';
 
 /**
  * Renames a temporary PDF to its final name with request ID
@@ -43,13 +45,8 @@ export async function renamePdfWithRequestId(
     // ✅ Step 3: Decode blob name
     const decodedTempBlobName = decodeBlobName(tempBlobName);
     
-    // ✅ Step 4: Construct new blob path
-    const newBlobName = constructRenamedBlobPath(
-      decodedTempBlobName,
-      requestId,
-      originalFileName,
-      'invoices'
-    );
+    // ✅ Step 4: Generate new blob path using optimized structure
+    const newBlobName = convertTempToFinalPath(decodedTempBlobName, requestId);
     
     console.log(`🔄 Renaming PDF: ${decodedTempBlobName} → ${newBlobName}`);
     
@@ -256,4 +253,59 @@ export async function getPdfBlobInfo(blobName: string): Promise<{
     console.error('❌ Failed to get PDF blob information:', error);
     throw error;
   }
+}
+
+/**
+ * OPTIMIZED: Renames a temporary PDF to final hierarchical structure
+ * @param tempBlobPath - Current temporary blob path
+ * @param requestId - Request ID (TCRS-YYYY-NNNNNN format)
+ * @param company - Company name
+ * @param branch - Branch name
+ * @returns Final blob URL in optimized structure
+ */
+export async function renamePdfToOptimizedStructure(
+  tempBlobPath: string,
+  requestId: string,
+  company: string,
+  branch: string
+): Promise<string> {
+  console.log('🚀 Starting OPTIMIZED PDF rename to hierarchical structure...');
+  console.log(`📋 Parameters:`);
+  console.log(`   └── tempBlobPath: "${tempBlobPath}"`);
+  console.log(`   └── requestId: "${requestId}"`);
+  console.log(`   └── company: "${company}"`);
+  console.log(`   └── branch: "${branch}"`);
+  
+  try {
+    // Use the optimized move function
+    const result = await moveToFinalOptimizedLocation(
+      tempBlobPath,
+      requestId,
+      company,
+      branch
+    );
+    
+    console.log(`✅ OPTIMIZED PDF rename completed successfully!`);
+    console.log(`📁 New hierarchical path: ${result.finalBlobPath}`);
+    console.log(`🔗 New blob URL: ${result.finalBlobUrl}`);
+    
+    return result.finalBlobUrl;
+    
+  } catch (error) {
+    console.error('❌ OPTIMIZED PDF rename failed:', error);
+    throw new Error(`Failed to rename PDF to optimized structure: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Legacy wrapper - maintains backward compatibility
+ * @deprecated Use renamePdfToOptimizedStructure instead
+ */
+export async function renamePdfWithRequestIdLegacy(
+  tempBlobName: string,
+  requestId: string,
+  originalFileName: string
+): Promise<string> {
+  console.warn('⚠️ Using legacy PDF rename function. Consider upgrading to optimized structure.');
+  return renamePdfWithRequestId(tempBlobName, requestId, originalFileName);
 }

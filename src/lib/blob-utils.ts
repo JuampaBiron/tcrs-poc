@@ -1,5 +1,14 @@
 // src/lib/blob-utils.ts - CENTRALIZED AZURE BLOB UTILITIES
 import { BlobServiceClient, BlobClient } from '@azure/storage-blob';
+import { 
+  generateOptimizedBlobPath, 
+  generateTempBlobPath, 
+  convertTempToFinalPath,
+  parseBlobPath,
+  getRequestFilePaths,
+  type BlobPathConfig,
+  type TempBlobPathConfig 
+} from './blob-path-generator';
 
 // ========================================
 // AZURE BLOB SERVICE CLIENT
@@ -28,6 +37,81 @@ export const getBlobServiceClient = (): BlobServiceClient => {
 export const getContainerName = (): string => {
   return process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
 };
+
+/**
+ * Ensures container exists, creates it if it doesn't
+ * @param containerName - Name of the container to ensure exists
+ * @returns Container client
+ */
+export async function ensureContainerExists(containerName?: string): Promise<import('@azure/storage-blob').ContainerClient> {
+  const blobServiceClient = getBlobServiceClient();
+  const actualContainerName = containerName || getContainerName();
+  const containerClient = blobServiceClient.getContainerClient(actualContainerName);
+  
+  console.log(`🔍 Checking if container exists: "${actualContainerName}"`);
+  
+  try {
+    // Check if container exists
+    const exists = await containerClient.exists();
+    
+    if (exists) {
+      console.log(`✅ Container "${actualContainerName}" exists`);
+      return containerClient;
+    }
+    
+    console.log(`🆕 Container "${actualContainerName}" does not exist, creating...`);
+    
+    // Create container with appropriate access level
+    await containerClient.create({
+      access: 'blob' // Allow blob-level public read access
+    });
+    
+    console.log(`✅ Container "${actualContainerName}" created successfully`);
+    
+    // Set container metadata for tracking
+    await containerClient.setMetadata({
+      purpose: 'tcrs-approval-system',
+      createdBy: 'tcrs-system',
+      createdDate: new Date().toISOString(),
+      version: '1.0'
+    });
+    
+    console.log(`📋 Container metadata set successfully`);
+    
+    return containerClient;
+    
+  } catch (error) {
+    console.error(`❌ Failed to ensure container "${actualContainerName}" exists:`, error);
+    
+    // Check if it's a permissions error
+    if (error && typeof error === 'object' && 'code' in error) {
+      const azureError = error as any;
+      
+      switch (azureError.code) {
+        case 'AuthorizationFailure':
+          throw new Error(`Authorization failed for container "${actualContainerName}". Check Azure Storage credentials and permissions.`);
+        case 'ContainerAlreadyExists':
+          console.log(`ℹ️ Container "${actualContainerName}" was created by another process, continuing...`);
+          return containerClient;
+        case 'AccountNotFound':
+          throw new Error(`Azure Storage account not found. Check AZURE_STORAGE_ACCOUNT_NAME configuration.`);
+        default:
+          throw new Error(`Failed to create container "${actualContainerName}": ${azureError.message || 'Unknown Azure error'}`);
+      }
+    }
+    
+    throw new Error(`Failed to ensure container exists: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Gets container client with automatic creation if it doesn't exist
+ * @param containerName - Optional container name (uses default if not provided)
+ * @returns Container client
+ */
+export async function getContainerClient(containerName?: string): Promise<import('@azure/storage-blob').ContainerClient> {
+  return await ensureContainerExists(containerName);
+}
 
 // ========================================
 // URL & BLOB NAME UTILITIES
@@ -408,4 +492,246 @@ export function validateRenameParameters(
   }
   
   console.log(`✅ ${fileType} rename parameters are valid`);
+}
+
+// ========================================
+// OPTIMIZED HIERARCHICAL BLOB OPERATIONS
+// ========================================
+
+/**
+ * Creates a temporary blob with optimized hierarchical path structure
+ * @param config - Temporary blob configuration
+ * @param fileBuffer - File content buffer
+ * @param contentType - MIME type of the file
+ * @returns Blob URL and metadata
+ */
+export async function createOptimizedTempBlob(
+  config: TempBlobPathConfig,
+  fileBuffer: Buffer,
+  contentType: string
+): Promise<{
+  blobUrl: string
+  blobPath: string
+  tempId: string
+}> {
+  console.log(`🚀 Creating optimized temporary blob...`)
+  console.log(`📋 Config:`, config)
+  
+  try {
+    const containerClient = await getContainerClient()
+    
+    // Generate optimized temp path
+    const blobPath = generateTempBlobPath(config)
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath)
+    
+    // Upload with metadata
+    await blockBlobClient.uploadData(fileBuffer, {
+      blobHTTPHeaders: { 
+        blobContentType: contentType 
+      },
+      metadata: {
+        isTemporary: 'true',
+        company: config.company,
+        branch: config.branch,
+        tempId: config.tempId,
+        uploadDate: new Date().toISOString(),
+        originalFileName: config.fileName
+      }
+    })
+    
+    console.log(`✅ Optimized temporary blob created: ${blobPath}`)
+    
+    return {
+      blobUrl: blockBlobClient.url,
+      blobPath,
+      tempId: config.tempId
+    }
+    
+  } catch (error) {
+    console.error(`❌ Failed to create optimized temporary blob:`, error)
+    throw error
+  }
+}
+
+/**
+ * Moves temporary blob to final hierarchical location
+ * @param tempBlobPath - Temporary blob path
+ * @param requestId - Final request ID
+ * @param company - Company name
+ * @param branch - Branch name
+ * @returns Final blob URL and path
+ */
+export async function moveToFinalOptimizedLocation(
+  tempBlobPath: string,
+  requestId: string,
+  company: string,
+  branch: string
+): Promise<{
+  finalBlobUrl: string
+  finalBlobPath: string
+}> {
+  console.log(`🔄 Moving temporary blob to optimized final location...`)
+  console.log(`   Temp path: ${tempBlobPath}`)
+  console.log(`   Request ID: ${requestId}`)
+  console.log(`   Company: ${company}`)
+  console.log(`   Branch: ${branch}`)
+  
+  try {
+    const containerClient = await getContainerClient()
+    
+    // Parse temp path to get file info
+    const tempInfo = parseBlobPath(tempBlobPath)
+    
+    if (!tempInfo.isTemp) {
+      throw new Error(`Path is not a temporary path: ${tempBlobPath}`)
+    }
+    
+    // Generate final optimized path
+    const finalConfig: BlobPathConfig = {
+      requestId,
+      company,
+      branch,
+      fileName: tempInfo.fileName,
+      createdDate: new Date(tempInfo.year, tempInfo.month - 1)
+    }
+    
+    const finalBlobPath = generateOptimizedBlobPath(finalConfig)
+    
+    // Get blob clients
+    const tempBlobClient = containerClient.getBlobClient(tempBlobPath)
+    const finalBlobClient = containerClient.getBlobClient(finalBlobPath)
+    
+    // Check if temp blob exists
+    const tempExists = await checkBlobExists(tempBlobClient)
+    if (!tempExists) {
+      throw new Error(`Temporary blob not found: ${tempBlobPath}`)
+    }
+    
+    // Copy to final location
+    await copyBlob(tempBlobClient, finalBlobClient)
+    
+    // Update metadata for final blob
+    await updateBlobMetadata(finalBlobClient, requestId, tempInfo.fileName, 'finalized', {
+      company,
+      branch,
+      convertedFrom: tempBlobPath,
+      finalizedDate: new Date().toISOString()
+    })
+    
+    // Delete temporary blob
+    await deleteBlob(tempBlobClient)
+    
+    console.log(`✅ Blob moved to optimized final location: ${finalBlobPath}`)
+    
+    return {
+      finalBlobUrl: finalBlobClient.url,
+      finalBlobPath
+    }
+    
+  } catch (error) {
+    console.error(`❌ Failed to move blob to optimized final location:`, error)
+    throw error
+  }
+}
+
+/**
+ * Gets all blobs for a specific request using hierarchical structure
+ * @param requestId - Request ID
+ * @param company - Company name
+ * @param branch - Branch name
+ * @param year - Optional year filter
+ * @param month - Optional month filter
+ * @returns Object with categorized blob URLs
+ */
+export async function getRequestBlobs(
+  requestId: string,
+  company: string,
+  branch: string,
+  year?: number,
+  month?: number
+): Promise<{
+  allFiles: string[]
+}> {
+  console.log(`📁 Getting all blobs for request: ${requestId}`)
+  
+  try {
+    const containerClient = await getContainerClient()
+    
+    // Get request file paths
+    const paths = getRequestFilePaths(requestId, company, branch, year, month)
+    
+    const result = {
+      allFiles: [] as string[]
+    }
+    
+    // List blobs with request prefix
+    const blobIterator = containerClient.listBlobsFlat({
+      prefix: paths.basePath
+    })
+    
+    for await (const blob of blobIterator) {
+      const fullUrl = `${containerClient.url}/${blob.name}`
+      result.allFiles.push(fullUrl)
+    }
+    
+    console.log(`📊 Found blobs for ${requestId}: ${result.allFiles.length} files`)
+    
+    return result
+    
+  } catch (error) {
+    console.error(`❌ Failed to get request blobs:`, error)
+    throw error
+  }
+}
+
+/**
+ * Creates a blob with optimized hierarchical path
+ * @param config - Blob path configuration
+ * @param fileBuffer - File content buffer
+ * @param contentType - MIME type of the file
+ * @returns Blob URL and path
+ */
+export async function createOptimizedBlob(
+  config: BlobPathConfig,
+  fileBuffer: Buffer,
+  contentType: string
+): Promise<{
+  blobUrl: string
+  blobPath: string
+}> {
+  console.log(`🚀 Creating optimized blob...`)
+  
+  try {
+    const containerClient = await getContainerClient()
+    
+    // Generate optimized path
+    const blobPath = generateOptimizedBlobPath(config)
+    const blockBlobClient = containerClient.getBlockBlobClient(blobPath)
+    
+    // Upload with comprehensive metadata
+    await blockBlobClient.uploadData(fileBuffer, {
+      blobHTTPHeaders: { 
+        blobContentType: contentType 
+      },
+      metadata: {
+        requestId: config.requestId,
+        company: config.company,
+        branch: config.branch,
+        originalFileName: config.fileName,
+        uploadDate: (config.createdDate || new Date()).toISOString(),
+        isTemporary: 'false'
+      }
+    })
+    
+    console.log(`✅ Optimized blob created: ${blobPath}`)
+    
+    return {
+      blobUrl: blockBlobClient.url,
+      blobPath
+    }
+    
+  } catch (error) {
+    console.error(`❌ Failed to create optimized blob:`, error)
+    throw error
+  }
 }

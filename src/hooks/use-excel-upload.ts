@@ -14,7 +14,7 @@ interface ExcelUploadResult {
 }
 
 interface UseExcelUploadReturn {
-  uploadExcel: (file: File, uploadType?: 'direct' | 'temp') => Promise<ExcelUploadResult>;
+  uploadExcel: (file: File, uploadType?: 'direct' | 'temp', company?: string, branch?: string) => Promise<ExcelUploadResult>;
   uploading: boolean;
   error: string | null;
   progress: number;
@@ -30,7 +30,7 @@ export function useExcelUpload(): UseExcelUploadReturn {
     setError(null);
   };
 
-  const uploadExcel = async (file: File, uploadType: 'direct' | 'temp' = 'temp'): Promise<ExcelUploadResult> => {
+  const uploadExcel = async (file: File, uploadType: 'direct' | 'temp' = 'temp', company?: string, branch?: string): Promise<ExcelUploadResult> => {
     setUploading(true);
     setError(null);
     setProgress(0);
@@ -59,6 +59,14 @@ export function useExcelUpload(): UseExcelUploadReturn {
       formData.append('excelFile', file);
       formData.append('uploadType', uploadType);
       formData.append('originalFileName', file.name);
+      
+      // Add company and branch if provided
+      if (company) {
+        formData.append('company', company);
+      }
+      if (branch) {
+        formData.append('branch', branch);
+      }
 
       const response = await fetch(API_ROUTES.UPLOAD_EXCEL, {
         method: 'POST',
@@ -68,7 +76,24 @@ export function useExcelUpload(): UseExcelUploadReturn {
       clearInterval(progressInterval);
       setProgress(100);
 
-      const result = await response.json();
+      // Better error handling for empty or invalid responses
+      const responseText = await response.text();
+      console.log('📄 Raw response:', responseText);
+      console.log('📊 Response status:', response.status);
+      console.log('📋 Response headers:', Object.fromEntries(response.headers.entries()));
+      
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+      
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        console.error('📄 Response text that failed to parse:', responseText);
+        throw new Error(`Invalid JSON response: ${responseText.substring(0, 100)}...`);
+      }
 
       if (!response.ok) {
         throw new Error(result.error || UPLOAD_ERRORS.UPLOAD_FAILED);

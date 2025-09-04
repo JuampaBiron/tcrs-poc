@@ -143,12 +143,16 @@ export default function DashboardSidebar({
               </div>
             </>
           ) : (
-            <div className="flex justify-center py-2">
-              <img
-                src="/finningF.png"
-                alt="Finning F"
-                className="h-16 w-16 object-contain"
-              />
+            <div className="flex flex-col items-center">
+              <div className="flex justify-center py-2 mb-8">
+                <img
+                  src="/finningF.png"
+                  alt="Finning F"
+                  className="h-16 w-16 object-contain"
+                />
+              </div>
+              {/* Spacer to match expanded state height */}
+              <div className="h-12"></div>
             </div>
           )}
         </div>
@@ -170,8 +174,8 @@ export default function DashboardSidebar({
                     onClick={() => handleNavClick(item.href)}
                     disabled={isLoading}
                     className={`
-                      w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-200
-                      ${collapsed ? 'justify-center' : 'justify-start'}
+                      w-full flex items-center rounded-lg transition-all duration-200
+                      ${collapsed ? 'justify-center px-3 py-3' : 'justify-start gap-3 px-3 py-3'}
                       ${
                         isActive
                           ? 'bg-gradient-to-r from-yellow-400 to-yellow-500 text-black font-medium shadow-lg shadow-yellow-500/25'
@@ -201,85 +205,94 @@ export default function DashboardSidebar({
           </nav>
         </div>
 
-        {/* Collapse Button */}
-        <div className="flex-shrink-0 px-4 py-4 border-t border-gray-100/60 bg-gradient-to-r from-transparent via-white/30 to-transparent">
-          <button
-            onClick={onToggleCollapse}
-            className="hidden lg:flex items-center justify-center w-full h-10 text-gray-400 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg transition-all duration-200 hover:shadow-sm"
-          >
-            {collapsed ? (
-              <ChevronRight className="w-4 h-4" />
-            ) : (
-              <div className="flex items-center gap-2">
-                <ChevronLeft className="w-4 h-4" />
-                <span className="text-xs font-semibold tracking-wide uppercase">Collapse</span>
-              </div>
-            )}
-          </button>
-        </div>
+        {/* Lower Section Container - Organized 4 elements */}
+        <div className="flex-shrink-0">
+          {/* 1. Collapse Button */}
+          <div className={`border-t border-gray-100/60 bg-gradient-to-r from-transparent via-white/30 to-transparent ${collapsed ? 'px-2 py-3' : 'px-4 py-3'}`}>
+            <button
+              onClick={onToggleCollapse}
+              className={`hidden lg:flex items-center justify-center text-gray-400 hover:text-blue-600 hover:bg-blue-50/50 rounded-lg transition-all duration-200 hover:shadow-sm ${collapsed ? 'w-12 h-9 mx-auto' : 'w-full h-9'}`}
+            >
+              {collapsed ? (
+                <ChevronRight className="w-4 h-4" />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <ChevronLeft className="w-4 h-4" />
+                  <span className="text-xs font-semibold tracking-wide uppercase">Collapse</span>
+                </div>
+              )}
+            </button>
+          </div>
 
-        {/* User Section */}
-        <div className={`flex-shrink-0 border-t border-gray-100/60 bg-gradient-to-b from-gray-50/20 to-gray-100/30 ${collapsed ? 'p-2' : 'p-4'}`}>
-          <div className="relative h-36">
-            {/* Expanded State */}
-            <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
-              collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            }`}>
-              <div className="h-full flex flex-col justify-between py-1">
-                {/* User Info */}
-                <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-white via-gray-50 to-gray-100/70 rounded-lg shadow-sm border border-gray-200/40">
-                  <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-semibold shadow-md">
-                    {user.name?.charAt(0)?.toUpperCase() || 'U'}
+          {/* 2-4. User Section Container */}
+          <div className={`border-t border-gray-100/60 bg-gradient-to-b from-gray-50/20 to-gray-100/30 ${collapsed ? 'px-2 py-4' : 'px-4 py-4'}`}>
+            <div className="relative h-40">
+              {/* Expanded State */}
+              <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
+                collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}>
+                <div className="h-full flex flex-col space-y-3">
+                  {/* 2. User Info Card */}
+                  <div className="flex items-center gap-3 p-3 bg-gradient-to-br from-white via-gray-50 to-gray-100/70 rounded-lg shadow-sm border border-gray-200/40 h-14">
+                    <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-semibold shadow-md flex-shrink-0">
+                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
+                        {user.name}
+                      </p>
+                      <p className="text-xs font-medium text-gray-500 truncate leading-relaxed">
+                        {user.email}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate leading-tight">
-                      {user.name}
-                    </p>
-                    <p className="text-xs font-medium text-gray-600 truncate leading-relaxed">
-                      {user.email}
-                    </p>
+
+                  {/* 3. Role Badge */}
+                  <div className="flex justify-center h-10">
+                    <span className="inline-flex items-center px-3 py-1 text-sm font-bold text-yellow-800 bg-gradient-to-r from-yellow-100 to-yellow-50 rounded-xl border border-yellow-200 shadow-sm tracking-wider uppercase">
+                      {userRole}
+                    </span>
+                  </div>
+
+                  {/* 4. Sign Out Button */}
+                  <div className="h-10 flex items-center">
+                    <SignOutButton 
+                      variant="sidebar" 
+                      collapsed={false} 
+                    />
                   </div>
                 </div>
-
-                {/* Role Badge */}
-                <div className="flex justify-center">
-                  <span className="inline-flex items-center px-3 py-1 text-xs font-bold text-yellow-800 bg-gradient-to-r from-yellow-100 to-yellow-50 rounded-full border border-yellow-200 shadow-sm tracking-wider uppercase">
-                    {userRole}
-                  </span>
-                </div>
-
-                {/* Sign Out Button */}
-                <div className="flex justify-center">
-                  <SignOutButton 
-                    variant="sidebar" 
-                    collapsed={false} 
-                  />
-                </div>
               </div>
-            </div>
 
-            {/* Collapsed State */}
-            <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
-              collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}>
-              <div className="h-full flex flex-col justify-between items-center py-1">
-                {/* Collapsed User Avatar */}
-                <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-bold text-sm shadow-md">
-                  {user.name?.charAt(0)?.toUpperCase() || 'U'}
+              {/* Collapsed State - Perfectly aligned */}
+              <div className={`absolute inset-0 transition-all duration-500 ease-in-out ${
+                collapsed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}>
+                <div className="h-full flex flex-col items-center space-y-3">
+                  {/* 2. Collapsed User Avatar */}
+                  <div className="h-14 flex items-center">
+                    <div className="w-9 h-9 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-lg flex items-center justify-center text-black font-bold text-sm shadow-md">
+                      {user.name?.charAt(0)?.toUpperCase() || 'U'}
+                    </div>
+                  </div>
+                  
+                  {/* 3. Collapsed Role Badge */}
+                  <div className="h-14 flex items-center">
+                    <div className="w-9 h-9 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-lg flex items-center justify-center border border-yellow-300/50 shadow-sm">
+                      <span className="text-[14px] font-bold text-yellow-800 uppercase">
+                        {userRole.charAt(0)}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  {/* 4. Collapsed Sign Out */}
+                  <div className="h-8 flex items-center">
+                    <SignOutButton 
+                      variant="icon" 
+                      collapsed={true} 
+                    />
+                  </div>
                 </div>
-                
-                {/* Collapsed Role Badge */}
-                <div className="w-8 h-8 bg-gradient-to-br from-yellow-100 to-yellow-200 rounded-full flex items-center justify-center border border-yellow-300/50 shadow-sm">
-                  <span className="text-[8px] font-bold text-yellow-800 uppercase">
-                    {userRole.charAt(0)}
-                  </span>
-                </div>
-                
-                {/* Collapsed Sign Out */}
-                <SignOutButton 
-                  variant="icon" 
-                  collapsed={true} 
-                />
               </div>
             </div>
           </div>

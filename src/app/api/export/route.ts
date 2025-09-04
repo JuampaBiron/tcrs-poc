@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from "@/auth"
 import { getUserRole } from "@/lib/auth-utils"
-import { getRequestsByUser, getRequestsByApprover, getAllRequests } from '@/db/queries'
+import { getRequestsByUserPaginated, getRequestsByApproverPaginated, getAllRequestsPaginated, getTotalRequestsCount } from '@/db/queries'
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
 import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
 import ExcelJS from 'exceljs' // ✅ Import ExcelJS
@@ -42,17 +42,34 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // 4. Obtener datos según el rol
+    // 4. Verificar total de registros y obtener datos paginados (máximo 1000)
+    const totalCount = await getTotalRequestsCount(role, email)
+    console.log(`📊 Total available records: ${totalCount}`)
+    
+    if (totalCount === 0) {
+      return NextResponse.json({ 
+        error: 'No data available for export' 
+      }, { status: 400 })
+    }
+
+    const EXPORT_LIMIT = 1000
     let requests
+    let exportMessage = ''
+    
+    if (totalCount > EXPORT_LIMIT) {
+      exportMessage = `⚠️ Export limited to ${EXPORT_LIMIT} most recent records (${totalCount} total available)`
+      console.log(exportMessage)
+    }
+
     switch (role) {
       case USER_ROLES.REQUESTER:
-        requests = await getRequestsByUser(email)
+        requests = await getRequestsByUserPaginated(email, EXPORT_LIMIT, 0)
         break
       case USER_ROLES.APPROVER:
-        requests = await getRequestsByApprover(email)
+        requests = await getRequestsByApproverPaginated(email, EXPORT_LIMIT, 0)
         break
       case USER_ROLES.ADMIN:
-        requests = await getAllRequests()
+        requests = await getAllRequestsPaginated(EXPORT_LIMIT, 0)
         break
       default:
         throw new ValidationError('Invalid role')
@@ -78,21 +95,40 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 6. ✅ CREAR EXCEL SIMPLE
-    const excelBuffer = await createSimpleExcel(filteredRequests)
-
-    console.log(`✅ Exporting ${filteredRequests.length} records to simple Excel`)
-
-    // 7. ✅ RETORNAR ARCHIVO EXCEL
-    const filename = `tcrs-requests-${filters?.searchQuery ? 'filtered-' : ''}${new Date().toISOString().split('T')[0]}.xlsx`
+    // 6. ✅ CREAR EXCEL CON STREAMING
+    const actualRecords = filteredRequests.length
+    const limitApplied = totalCount > EXPORT_LIMIT
     
-    // ✅ FIX: Use Uint8Array.from() to create a web-compatible ArrayBuffer from the Node.js Buffer
-    return new NextResponse(Uint8Array.from(excelBuffer), { 
+    console.log(`✅ Exporting ${actualRecords} records to Excel with streaming ${limitApplied ? '(LIMITED)' : ''}`)
+
+    // 7. ✅ RETORNAR ARCHIVO EXCEL CON STREAMING
+    const limitSuffix = limitApplied ? '-limited' : ''
+    const filename = `tcrs-requests${limitSuffix}-${filters?.searchQuery ? 'filtered-' : ''}${new Date().toISOString().split('T')[0]}.xlsx`
+    
+    // ✅ Crear ReadableStream para streaming response
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          await createStreamedExcel(filteredRequests, controller, {
+            totalAvailable: totalCount,
+            limitApplied: limitApplied,
+            exportLimit: EXPORT_LIMIT,
+            role: role
+          })
+          controller.close()
+        } catch (error) {
+          console.error('❌ Streaming error:', error)
+          controller.error(error)
+        }
+      }
+    })
+
+    return new Response(stream, { 
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="${filename}"`,
-        'Content-Length': excelBuffer.length.toString(),
         'Cache-Control': 'no-cache',
+        'Transfer-Encoding': 'chunked'
       }
     })
 
@@ -105,15 +141,64 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ===== FUNCIÓN SIMPLE DE CREACIÓN DE EXCEL =====
+// ===== FUNCIÓN DE CREACIÓN DE EXCEL CON STREAMING =====
 
-async function createSimpleExcel(requests: any[]): Promise<Buffer> {
+interface ExcelMetadata {
+  totalAvailable: number
+  limitApplied: boolean
+  exportLimit: number
+  role: string
+}
+
+async function createStreamedExcel(
+  requests: any[], 
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  metadata?: ExcelMetadata
+) {
   
   // ✅ Crear workbook básico
   const workbook = new ExcelJS.Workbook()
   
-  // ✅ Crear una sola hoja llamada "Base"
-  const worksheet = workbook.addWorksheet('Base')
+  // ✅ Crear hoja principal
+  const worksheet = workbook.addWorksheet('TCRS Data')
+  
+  // ✅ Agregar información sobre limitación si aplica
+  if (metadata?.limitApplied) {
+    const infoSheet = workbook.addWorksheet('Export Info')
+    
+    // Headers de información
+    infoSheet.getCell('A1').value = 'TCRS Export Information'
+    infoSheet.getCell('A1').font = { bold: true, size: 16 }
+    infoSheet.getCell('A1').fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF70AD47' }
+    }
+    
+    // Información detallada
+    infoSheet.getCell('A3').value = 'Export Date:'
+    infoSheet.getCell('B3').value = new Date().toLocaleString()
+    infoSheet.getCell('A4').value = 'User Role:'
+    infoSheet.getCell('B4').value = metadata.role.toUpperCase()
+    infoSheet.getCell('A5').value = 'Total Records Available:'
+    infoSheet.getCell('B5').value = metadata.totalAvailable
+    infoSheet.getCell('A6').value = 'Records Exported:'
+    infoSheet.getCell('B6').value = Math.min(requests.length, metadata.exportLimit)
+    infoSheet.getCell('A7').value = 'Export Limit Applied:'
+    infoSheet.getCell('B7').value = metadata.limitApplied ? 'YES' : 'NO'
+    
+    if (metadata.limitApplied) {
+      infoSheet.getCell('A9').value = '⚠️ NOTICE:'
+      infoSheet.getCell('A9').font = { bold: true, color: { argb: 'FFFF6600' } }
+      infoSheet.getCell('A10').value = `This export is limited to the ${metadata.exportLimit} most recent records.`
+      infoSheet.getCell('A11').value = `${metadata.totalAvailable - metadata.exportLimit} older records were not included.`
+      infoSheet.getCell('A12').value = 'Apply filters to export specific data subsets.'
+    }
+    
+    // Ajustar anchos
+    infoSheet.getColumn('A').width = 25
+    infoSheet.getColumn('B').width = 40
+  }
 
   // ✅ Preparar datos simples
   const exportData = requests.map(req => ({
@@ -152,39 +237,63 @@ async function createSimpleExcel(requests: any[]): Promise<Buffer> {
     }
   })
   
-  // ✅ Agregar datos (sin formato especial)
-  exportData.forEach((row, rowIndex) => {
-    const excelRow = worksheet.getRow(rowIndex + 2) // Empezar en fila 2
-    const values = Object.values(row)
+  // ✅ Agregar datos en lotes para optimizar memoria
+  const BATCH_SIZE = 500 // Procesar de 500 en 500 filas
+  for (let i = 0; i < exportData.length; i += BATCH_SIZE) {
+    const batch = exportData.slice(i, i + BATCH_SIZE)
     
-    values.forEach((value, colIndex) => {
-      const cell = excelRow.getCell(colIndex + 1)
-      cell.value = value
-      // ✅ Sin formato especial, solo el valor
+    batch.forEach((row, batchIndex) => {
+      const rowIndex = i + batchIndex
+      const excelRow = worksheet.getRow(rowIndex + 2) // Empezar en fila 2
+      const values = Object.values(row)
+      
+      values.forEach((value, colIndex) => {
+        const cell = excelRow.getCell(colIndex + 1)
+        cell.value = value
+      })
     })
-  })
+    
+    // ✅ Pequeña pausa para evitar bloquear el event loop
+    if (i % (BATCH_SIZE * 4) === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+  }
 
   // ✅ Ajustar ancho de columnas automáticamente
   headers.forEach((header, index) => {
     const column = worksheet.getColumn(index + 1)
     let maxLength = header.length
     
-    // Calcular ancho basado en contenido
-    exportData.forEach(row => {
-      const value = Object.values(row)[index]
+    // Calcular ancho basado en una muestra para optimizar
+    const sampleSize = Math.min(100, exportData.length)
+    for (let i = 0; i < sampleSize; i++) {
+      const value = Object.values(exportData[i])[index]
       const valueLength = String(value).length
       if (valueLength > maxLength) {
         maxLength = valueLength
       }
-    })
+    }
     
     // Establecer ancho (mínimo 10, máximo 50)
     column.width = Math.max(10, Math.min(50, maxLength + 2))
   })
 
-  // ✅ Generar buffer
+  // ✅ Generar Excel en buffer pero enviarlo por chunks para optimizar memoria
   const buffer = await workbook.xlsx.writeBuffer()
-  return Buffer.from(buffer)
+  
+  // ✅ Enviar el buffer por chunks en lugar de todo de una vez
+  const CHUNK_SIZE = 64 * 1024 // 64KB chunks
+  const uint8Buffer = new Uint8Array(buffer)
+  
+  for (let i = 0; i < uint8Buffer.length; i += CHUNK_SIZE) {
+    const chunk = uint8Buffer.slice(i, i + CHUNK_SIZE)
+    controller.enqueue(chunk)
+    
+    // Pequeña pausa para evitar bloquear el event loop
+    if (i % (CHUNK_SIZE * 4) === 0) {
+      await new Promise(resolve => setTimeout(resolve, 0))
+    }
+  }
 }
 
 // ===== FUNCIONES AUXILIARES SIMPLES =====

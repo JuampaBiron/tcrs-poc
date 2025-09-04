@@ -1,5 +1,5 @@
 {
-  "id": "2818fa7b-4394-44c2-90ba-24671430d632",
+  "id": "83ced5c1-eeb7-4670-aac7-2f6d3d9b2ce3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -139,10 +139,16 @@
       "name": "approval_requests",
       "schema": "",
       "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(255)",
+          "primaryKey": true,
+          "notNull": true
+        },
         "request_id": {
           "name": "request_id",
           "type": "varchar(255)",
-          "primaryKey": true,
+          "primaryKey": false,
           "notNull": true
         },
         "requester": {
@@ -189,10 +195,34 @@
           "notNull": false
         }
       },
-      "indexes": {},
+      "indexes": {
+        "approval_requests_request_id_idx": {
+          "name": "approval_requests_request_id_idx",
+          "columns": [
+            {
+              "expression": "request_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
+      "uniqueConstraints": {
+        "approval_requests_request_id_unique": {
+          "name": "approval_requests_request_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "request_id"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

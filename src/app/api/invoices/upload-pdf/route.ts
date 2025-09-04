@@ -1,14 +1,15 @@
-// src/app/api/invoices/upload-pdf/route.ts - IMPROVED VERSION
+// src/app/api/invoices/upload-pdf/route.ts - HIERARCHICAL VERSION
 import { NextRequest, NextResponse } from 'next/server';
 import { BlobServiceClient } from '@azure/storage-blob';
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler';
 import { FILE_UPLOAD, UPLOAD_ERRORS } from '@/constants';
+import { generateTempBlobPath } from '@/lib/blob-path-generator';
 
 // Azure Blob Storage client
 const getBlobServiceClient = () => {
   const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
   const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
-  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices-pdf';
+  const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'invoices';
   
   if (!accountName || !accountKey) {
     throw new Error('Azure Storage credentials not configured');
@@ -53,6 +54,10 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const context = formData.get('context') as string || 'direct';
+    const company = formData.get('company') as string || 'finning-ca';
+    const branch = formData.get('branch') as string || 'default';
+    
+    console.log(`📋 Upload parameters - Company: "${company}", Branch: "${branch}"`);
     
     // Validation
     if (!file) {
@@ -67,16 +72,29 @@ export async function POST(request: NextRequest) {
       throw new ValidationError(UPLOAD_ERRORS.FILE_TOO_LARGE);
     }
     
-    // ✅ IMPROVED: Generate blob-friendly names
+    if (!company) {
+      throw new ValidationError('Company information is required');
+    }
+    
+    if (!branch) {
+      throw new ValidationError('Branch information is required');
+    }
+    
+    // ✅ HIERARCHICAL: Generate hierarchical blob path using new structure
     const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
     const timestamp = generateBlobFriendlyTimestamp(); // No special characters
     const randomId = Math.random().toString(36).substr(2, 9);
+    const tempId = `TEMP-${timestamp}-${randomId}`;
     const sanitizedFileName = sanitizeFileName(file.name);
     
-    // ✅ IMPROVED: Blob name without URL-problematic characters
-    const blobName = `invoices/${year}/${month}/TEMP-${timestamp}_${sanitizedFileName}`;
+    // Use new hierarchical structure: temp/{company}/{branch}/{year}/{month}/{tempId}/{fileName}
+    const blobName = generateTempBlobPath({
+      company,
+      branch,
+      fileName: sanitizedFileName,
+      tempId,
+      createdDate: now
+    });
     
     console.log(`📤 Uploading PDF: ${blobName}`);
     
@@ -100,10 +118,10 @@ export async function POST(request: NextRequest) {
         context: context,
         originalFileName: file.name,
         uploadedAt: now.toISOString(),
-        tempId: `${timestamp}_${randomId}`,
+        tempId,
         status: 'temporary', // For cleanup
-        year: year.toString(),
-        month: month,
+        company,
+        branch,
       },
     });
     
@@ -116,10 +134,10 @@ export async function POST(request: NextRequest) {
       blobUrl,
       originalFileName: file.name,
       size: file.size,
-      blobName, // ✅ IMPROVED: Return actual blob name (not URL-encoded)
-      tempId: `${timestamp}_${randomId}`,
-      year: year,
-      month: parseInt(month),
+      blobName, // ✅ HIERARCHICAL: Return hierarchical blob name
+      tempId,
+      company,
+      branch,
     });
     
   } catch (error) {

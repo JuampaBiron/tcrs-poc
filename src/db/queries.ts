@@ -5,6 +5,7 @@ import { UserRole } from "@/types"
 import { approverList } from './schema'
 import { createId } from "@paralleldrive/cuid2"
 import { trackRequestCreated } from "@/lib/workflow-tracker"
+import { generateRequestId } from "@/lib/request-id-generator"
 import type { GLCodingEntry } from '@/types';
 // ===== DICTIONARY QUERIES =====
 
@@ -114,6 +115,71 @@ export async function getAllRequests() {
     .orderBy(desc(approvalRequests.createdDate))
 }
 
+// ===== PAGINATED EXPORT QUERIES =====
+
+export async function getRequestsByUserPaginated(userEmail: string, limit: number = 1000, offset: number = 0) {
+  return await db
+    .select()
+    .from(approvalRequests)
+    .where(eq(approvalRequests.requester, userEmail))
+    .orderBy(desc(approvalRequests.createdDate))
+    .limit(limit)
+    .offset(offset)
+}
+
+export async function getRequestsByApproverPaginated(approverEmail: string, limit: number = 1000, offset: number = 0) {
+  return await db
+    .select()
+    .from(approvalRequests)
+    .where(eq(approvalRequests.assignedApprover, approverEmail))
+    .orderBy(desc(approvalRequests.createdDate))
+    .limit(limit)
+    .offset(offset)
+}
+
+export async function getAllRequestsPaginated(limit: number = 1000, offset: number = 0) {
+  return await db
+    .select()
+    .from(approvalRequests)
+    .orderBy(desc(approvalRequests.createdDate))
+    .limit(limit)
+    .offset(offset)
+}
+
+export async function getTotalRequestsCount(role: UserRole, email?: string) {
+  let countQuery;
+  
+  switch (role) {
+    case USER_ROLES.REQUESTER:
+      if (!email) throw new Error('Email required for requester')
+      countQuery = db
+        .select({ count: count() })
+        .from(approvalRequests)
+        .where(eq(approvalRequests.requester, email))
+      break
+      
+    case USER_ROLES.APPROVER:
+      if (!email) throw new Error('Email required for approver')
+      countQuery = db
+        .select({ count: count() })
+        .from(approvalRequests)
+        .where(eq(approvalRequests.assignedApprover, email))
+      break
+      
+    case USER_ROLES.ADMIN:
+      countQuery = db
+        .select({ count: count() })
+        .from(approvalRequests)
+      break
+      
+    default:
+      throw new Error('Invalid role')
+  }
+  
+  const result = await countQuery
+  return result[0]?.count || 0
+}
+
 // ===== STATISTICS QUERIES =====
 
 export async function getRequestStats() {
@@ -210,11 +276,20 @@ export async function createApprovalRequest(data: {
   assignedApprover: string
   comments?: string
 }) {
+  // Generate unique Request ID
+  const requestId = await generateRequestId()
+  
   const [request] = await db
     .insert(approvalRequests)
     .values({
-      ...data,
-      approverStatus: REQUEST_STATUS.PENDING
+      id: createId(),
+      requestId,
+      requester: data.requester,
+      assignedApprover: data.assignedApprover,
+      approverStatus: REQUEST_STATUS.PENDING,
+      comments: data.comments || null,
+      createdDate: new Date(),
+      modifiedDate: null,
     })
     .returning()
 
@@ -383,10 +458,14 @@ export async function createRequestInDatabase(data: {
     Number(invoiceFormData.amount)
   );
 
+  // Generar Request ID único usando nuestro formato personalizado
+  const requestId = await generateRequestId();
+  console.log(`🆔 Creating request with ID: ${requestId}`);
+  
   // Transacción
-  const requestId = `REQ-${new Date().getFullYear()}-${createId()}`;
   await db.transaction(async (tx) => {
     await tx.insert(approvalRequests).values({
+      id: createId(), // Generate internal ID for primary key
       requestId,
       requester,
       assignedApprover: approverEmail,

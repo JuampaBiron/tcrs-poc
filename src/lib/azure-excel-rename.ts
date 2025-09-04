@@ -1,4 +1,4 @@
-// src/lib/azure-excel-rename.ts - REFACTORED VERSION USING BLOB-UTILS
+// src/lib/azure-excel-rename.ts - OPTIMIZED VERSION WITH HIERARCHICAL STRUCTURE  
 import {
   getBlobServiceClient,
   getContainerName,
@@ -9,8 +9,10 @@ import {
   updateBlobMetadata,
   deleteBlob,
   validateRenameParameters,
-  extractBlobNameFromUrl
+  extractBlobNameFromUrl,
+  moveToFinalOptimizedLocation
 } from './blob-utils';
+import { parseBlobPath, convertTempToFinalPath } from './blob-path-generator';
 
 /**
  * Renames a temporary Excel file to its final name with request ID
@@ -44,13 +46,18 @@ export async function renameExcelWithRequestId(
     // ✅ Step 3: Decode blob name
     const decodedTempBlobName = decodeBlobName(tempBlobName);
     
-    // ✅ Step 4: Construct new blob path for GL Coding Excel files
-    const newBlobName = constructRenamedBlobPath(
-      decodedTempBlobName,
-      requestId,
-      originalFileName,
-      'gl-coding' // Different path type for Excel files
-    );
+    // ✅ Step 4: Parse temp path to extract company and branch info
+    const parsedPath = parseBlobPath(decodedTempBlobName);
+    
+    // ✅ Step 5: Generate final hierarchical path using optimized structure
+    const finalBlobPath = convertTempToFinalPath(decodedTempBlobName, requestId);
+    
+    console.log(`🔄 Using optimized hierarchical structure`);
+    console.log(`   └── Parsed temp path company: ${parsedPath.company}`);
+    console.log(`   └── Parsed temp path branch: ${parsedPath.branch}`);
+    console.log(`   └── Final hierarchical path: ${finalBlobPath}`);
+    
+    const newBlobName = finalBlobPath;
     
     console.log(`🔄 Renaming Excel: ${decodedTempBlobName} → ${newBlobName}`);
     
@@ -349,4 +356,59 @@ export async function processGLCodingExcelSummary(blobName: string): Promise<{
     console.error('❌ Failed to process GL Coding Excel summary:', error);
     throw error;
   }
+}
+
+/**
+ * OPTIMIZED: Renames a temporary Excel file to final hierarchical structure
+ * @param tempBlobPath - Current temporary blob path
+ * @param requestId - Request ID (TCRS-YYYY-NNNNNN format)
+ * @param company - Company name
+ * @param branch - Branch name
+ * @returns Final blob URL in optimized structure
+ */
+export async function renameExcelToOptimizedStructure(
+  tempBlobPath: string,
+  requestId: string,
+  company: string,
+  branch: string
+): Promise<string> {
+  console.log('🚀 Starting OPTIMIZED Excel rename to hierarchical structure...');
+  console.log(`📋 Parameters:`);
+  console.log(`   └── tempBlobPath: "${tempBlobPath}"`);
+  console.log(`   └── requestId: "${requestId}"`);
+  console.log(`   └── company: "${company}"`);
+  console.log(`   └── branch: "${branch}"`);
+  
+  try {
+    // Use the optimized move function
+    const result = await moveToFinalOptimizedLocation(
+      tempBlobPath,
+      requestId,
+      company,
+      branch
+    );
+    
+    console.log(`✅ OPTIMIZED Excel rename completed successfully!`);
+    console.log(`📁 New hierarchical path: ${result.finalBlobPath}`);
+    console.log(`🔗 New blob URL: ${result.finalBlobUrl}`);
+    
+    return result.finalBlobUrl;
+    
+  } catch (error) {
+    console.error('❌ OPTIMIZED Excel rename failed:', error);
+    throw new Error(`Failed to rename Excel to optimized structure: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
+
+/**
+ * Legacy wrapper - maintains backward compatibility
+ * @deprecated Use renameExcelToOptimizedStructure instead
+ */
+export async function renameExcelWithRequestIdLegacy(
+  tempBlobName: string,
+  requestId: string,
+  originalFileName: string
+): Promise<string> {
+  console.warn('⚠️ Using legacy Excel rename function. Consider upgrading to optimized structure.');
+  return renameExcelWithRequestId(tempBlobName, requestId, originalFileName);
 }

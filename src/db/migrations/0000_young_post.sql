@@ -22,14 +22,16 @@ CREATE TABLE "accounts" (
 );
 --> statement-breakpoint
 CREATE TABLE "approval_requests" (
-	"request_id" varchar(255) PRIMARY KEY NOT NULL,
+	"id" varchar(255) PRIMARY KEY NOT NULL,
+	"request_id" varchar(255) NOT NULL,
 	"requester" varchar(255),
 	"assigned_approver" varchar(255),
 	"approver_status" varchar(50),
 	"approved_date" timestamp,
 	"comments" varchar(1000),
 	"created_date" timestamp DEFAULT now(),
-	"modified_date" timestamp
+	"modified_date" timestamp,
+	CONSTRAINT "approval_requests_request_id_unique" UNIQUE("request_id")
 );
 --> statement-breakpoint
 CREATE TABLE "approver_list" (
@@ -157,6 +159,7 @@ CREATE TABLE "workflow_steps" (
 	CONSTRAINT "workflow_steps_step_code_unique" UNIQUE("step_code")
 );
 --> statement-breakpoint
+CREATE INDEX "approval_requests_request_id_idx" ON "approval_requests" USING btree ("request_id");--> statement-breakpoint
 CREATE INDEX "idx_workflow_timeline" ON "workflow_history" USING btree ("request_id","executed_date");--> statement-breakpoint
 CREATE INDEX "idx_workflow_step_monitoring" ON "workflow_history" USING btree ("step_id","executed_date");--> statement-breakpoint
 CREATE INDEX "idx_workflow_errors" ON "workflow_history" USING btree ("success","error_code","executed_date");--> statement-breakpoint
