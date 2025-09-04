@@ -1,12 +1,10 @@
-// Archivo: src/app/api/export/route.ts
-
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from "@/auth"
 import { getUserRole } from "@/lib/auth-utils"
-import { getRequestsByUserPaginated, getRequestsByApproverPaginated, getAllRequestsPaginated, getTotalRequestsCount } from '@/db/queries'
+import { getRequestsTableData, getTotalRequestsCount } from '@/db/queries'
 import { createSuccessResponse, createErrorResponse, ValidationError } from '@/lib/error-handler'
 import { USER_ROLES, REQUEST_STATUS, isValidUserRole } from '@/constants'
-import ExcelJS from 'exceljs' // ✅ Import ExcelJS
+import ExcelJS from 'exceljs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,7 +40,7 @@ export async function POST(request: NextRequest) {
       }, { status: 403 })
     }
 
-    // 4. Verificar total de registros y obtener datos paginados (máximo 1000)
+    // 4. Verificar total de registros disponibles
     const totalCount = await getTotalRequestsCount(role, email)
     console.log(`📊 Total available records: ${totalCount}`)
     
@@ -52,38 +50,24 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    const EXPORT_LIMIT = 1000
-    let requests
-    let exportMessage = ''
-    
-    if (totalCount > EXPORT_LIMIT) {
-      exportMessage = `⚠️ Export limited to ${EXPORT_LIMIT} most recent records (${totalCount} total available)`
-      console.log(exportMessage)
-    }
+    // 5. Obtener datos completos usando getRequestsTableData
+    const requests = await getRequestsTableData({
+      userEmail: email,
+      userRole: role
+    })
 
-    switch (role) {
-      case USER_ROLES.REQUESTER:
-        requests = await getRequestsByUserPaginated(email, EXPORT_LIMIT, 0)
-        break
-      case USER_ROLES.APPROVER:
-        requests = await getRequestsByApproverPaginated(email, EXPORT_LIMIT, 0)
-        break
-      case USER_ROLES.ADMIN:
-        requests = await getAllRequestsPaginated(EXPORT_LIMIT, 0)
-        break
-      default:
-        throw new ValidationError('Invalid role')
-    }
+    console.log(`📊 Retrieved ${requests.length} requests with full data`)
 
-    // 5. Aplicar filtros
+    // 6. Aplicar filtros
     const filteredRequests = requests.filter(req => {
       const matchesSearch = filters?.searchQuery ? 
-        (req.comments?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
-         req.requester?.toLowerCase().includes(filters.searchQuery.toLowerCase())) : true
+        (req.requester?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+         req.company?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+         req.vendor?.toLowerCase().includes(filters.searchQuery.toLowerCase()) ||
+         req.po?.toLowerCase().includes(filters.searchQuery.toLowerCase())) : true
       
       const matchesStatus = filters?.status ? req.approverStatus === filters.status : true
-      const matchesBranch = filters?.branch ? 
-        extractBranch(req.comments || '').includes(filters.branch) : true
+      const matchesBranch = filters?.branch ? req.branch?.includes(filters.branch) : true
       
       return matchesSearch && matchesStatus && matchesBranch
     })
@@ -95,21 +79,21 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // 6. ✅ CREAR EXCEL CON STREAMING
-    const actualRecords = filteredRequests.length
-    const limitApplied = totalCount > EXPORT_LIMIT
+    // 7. Aplicar límite de exportación
+    const EXPORT_LIMIT = 1000
+    const limitApplied = filteredRequests.length > EXPORT_LIMIT
+    const finalRequests = limitApplied ? filteredRequests.slice(0, EXPORT_LIMIT) : filteredRequests
     
-    console.log(`✅ Exporting ${actualRecords} records to Excel with streaming ${limitApplied ? '(LIMITED)' : ''}`)
+    console.log(`✅ Exporting ${finalRequests.length} records to Excel ${limitApplied ? '(LIMITED)' : ''}`)
 
-    // 7. ✅ RETORNAR ARCHIVO EXCEL CON STREAMING
+    // 8. Retornar archivo Excel con streaming
     const limitSuffix = limitApplied ? '-limited' : ''
     const filename = `tcrs-requests${limitSuffix}-${filters?.searchQuery ? 'filtered-' : ''}${new Date().toISOString().split('T')[0]}.xlsx`
     
-    // ✅ Crear ReadableStream para streaming response
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          await createStreamedExcel(filteredRequests, controller, {
+          await createStreamedExcel(finalRequests, controller, {
             totalAvailable: totalCount,
             limitApplied: limitApplied,
             exportLimit: EXPORT_LIMIT,
@@ -200,18 +184,22 @@ async function createStreamedExcel(
     infoSheet.getColumn('B').width = 40
   }
 
-  // ✅ Preparar datos simples
-  const exportData = requests.map(req => ({
-    'Request ID': req.requestId,
-    'Description': req.comments || 'No description',
+  // ✅ Preparar datos con los campos exactos que retorna getRequestsTableData
+  const exportData = requests.map((req: any) => ({
+    'Request ID': req.requestId || 'N/A',
+    'Company': req.company || 'Unknown',
+    'Branch': req.branch || 'Unknown', 
+    'Vendor': req.vendor || 'Unknown',
+    'PO': req.po || 'N/A',
+    'Amount': req.amount || '0',
+    'Currency': req.currency || 'N/A',
+    'Submitted On': req.createdDate ? formatSimpleDate(req.createdDate) : 'N/A',
+    'GL Coding Count': req.glCodingCount || 0,
     'Status': req.approverStatus || REQUEST_STATUS.PENDING,
+    'Approved Date': req.approvedDate ? formatSimpleDate(req.approvedDate) : 'N/A',
     'Requester': req.requester || 'Unknown',
     'Assigned Approver': req.assignedApprover || 'Unassigned',
-    'Created Date': req.createdDate ? formatSimpleDate(req.createdDate) : '',
-    'Modified Date': req.modifiedDate ? formatSimpleDate(req.modifiedDate) : '',
-    'Branch': extractBranch(req.comments || ''),
-    'Amount': extractAmount(req.comments || ''),
-    'Currency': extractCurrency(req.comments || 'CAD')
+    'Created Date': req.requestCreatedDate ? formatSimpleDate(req.requestCreatedDate) : 'N/A'
   }))
 
   // ✅ Obtener headers
@@ -296,27 +284,16 @@ async function createStreamedExcel(
   }
 }
 
-// ===== FUNCIONES AUXILIARES SIMPLES =====
+// ===== FUNCIONES AUXILIARES =====
 
 function formatSimpleDate(date: Date | string): string {
   const d = new Date(date)
   if (isNaN(d.getTime())) return ''
   
-  // ✅ Formato simple DD/MM/YYYY
-  return d.toLocaleDateString('es-CL')
-}
-
-function extractBranch(comments: string): string {
-  const branchMatch = comments.match(/(TCRS - Branch \d+|Sitech|Fused-[A-Za-z]+)/i)
-  return branchMatch ? branchMatch[1] : 'Unknown'
-}
-
-function extractAmount(comments: string): string {
-  const amountMatch = comments.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i)
-  return amountMatch ? amountMatch[1] : 'N/A'
-}
-
-function extractCurrency(comments: string): string {
-  const currencyMatch = comments.match(/\$[0-9,]+(?:\.[0-9]{2})?\s+([A-Z]{3})/i)
-  return currencyMatch ? currencyMatch[1] : 'CAD'
+  // ✅ Formato MM/DD/YY para coincidir con la tabla UI
+  return d.toLocaleDateString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: '2-digit'
+  })
 }
