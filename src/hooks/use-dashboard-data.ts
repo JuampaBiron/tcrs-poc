@@ -1,5 +1,6 @@
 // src/hooks/use-dashboard-data.ts
 import { useState, useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { UserRole, Request, Stats } from '@/types'
 import { apiClient } from '@/lib/api-client'
 import { USER_ROLES } from '@/constants'
@@ -24,26 +25,19 @@ interface MyRequestFromDB {
   assignedApprover: string;
 }
 
-// Hook específico para requests del usuario (My Requests)
+// Hook optimizado con React Query para requests del usuario (My Requests)
+// Retorna interfaz compatible con React Query pero con nombres familiares
 export function useMyRequests(userEmail: string) {
-  const [data, setData] = useState<Request[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchMyRequests = async () => {
-    if (!userEmail) {
-      console.log('useMyRequests: No email provided, skipping fetch');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
+  const query = useQuery({
+    queryKey: ['my-requests', userEmail],
+    queryFn: async () => {
+      if (!userEmail) {
+        console.log('useMyRequests: No email provided, returning empty array');
+        return [];
+      }
 
       console.log(`🔄 Fetching my requests for email: ${userEmail}`);
 
-      // Llamar directamente al endpoint específico de my-requests
       const params = new URLSearchParams({ 
         email: userEmail 
       });
@@ -81,56 +75,40 @@ export function useMyRequests(userEmail: string) {
         po: dbRequest.po,
         currency: dbRequest.currency,
         company: dbRequest.company,
-        tcrsCompany: false, // Agregar campo faltante
+        tcrsCompany: false,
         approverStatus: dbRequest.approverStatus,
         createdDate: dbRequest.createdDate,
         assignedApprover: dbRequest.assignedApprover
       }));
 
       console.log(`✅ Successfully transformed ${transformedRequests.length} requests`);
-      setData(transformedRequests);
+      return transformedRequests;
+    },
+    enabled: !!userEmail,
+    staleTime: 1000 * 60 * 2, // 2 minutos - requests propios cambian moderadamente
+    gcTime: 1000 * 60 * 5, // 5 minutos en caché
+    refetchOnWindowFocus: true, // Refrescar cuando el usuario regresa
+    refetchOnMount: false,
+    retry: 2,
+  });
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch my requests';
-      console.error('❌ Error fetching my requests:', errorMessage);
-      setError(errorMessage);
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchMyRequests();
-  }, [userEmail]);
-
-  const refetch = () => {
-    fetchMyRequests();
-  };
-
+  // Retorna interfaz compatible con el código existente
   return {
-    data,
-    isLoading,
-    error,
-    refetch,
+    data: query.data || null,
+    isLoading: query.isLoading,
+    error: query.error?.message || null,
+    refetch: query.refetch,
   };
 }
-// Hook específico para requests rechazadas
+// Hook optimizado con React Query para requests rechazadas
 export function useRejectedRequests(userEmail: string) {
-  const [data, setData] = useState<any[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchRejectedRequests = async () => {
-    if (!userEmail) {
-      console.log('useRejectedRequests: No email provided, skipping fetch');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
+  const query = useQuery({
+    queryKey: ['rejected-requests', userEmail],
+    queryFn: async () => {
+      if (!userEmail) {
+        console.log('useRejectedRequests: No email provided, returning empty array');
+        return [];
+      }
 
       console.log(`🔄 Fetching rejected requests for email: ${userEmail}`);
 
@@ -177,50 +155,34 @@ export function useRejectedRequests(userEmail: string) {
       }));
 
       console.log(`✅ Successfully transformed ${transformedRequests.length} rejected requests`);
-      setData(transformedRequests);
+      return transformedRequests;
+    },
+    enabled: !!userEmail,
+    staleTime: 1000 * 60 * 5, // 5 minutos - requests rechazadas cambian poco
+    gcTime: 1000 * 60 * 10, // 10 minutos en caché
+    refetchOnWindowFocus: false, // No necesario refrescar automáticamente
+    refetchOnMount: false,
+    retry: 2,
+  });
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch rejected requests';
-      console.error('❌ Error fetching rejected requests:', errorMessage);
-      setError(errorMessage);
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchRejectedRequests();
-  }, [userEmail]);
-
-  const refetch = () => {
-    fetchRejectedRequests();
-  };
-
+  // Retorna interfaz compatible con el código existente
   return {
-    data,
-    isLoading,
-    error,
-    refetch,
+    data: query.data || null,
+    isLoading: query.isLoading,
+    error: query.error?.message || null,
+    refetch: query.refetch,
   } as const;
 }
 
-// Hook específico para requests asignadas al approver
+// Hook optimizado con React Query para requests asignadas al approver
 export function useApproverRequests(approverEmail: string) {
-  const [data, setData] = useState<Request[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchApproverRequests = async () => {
-    if (!approverEmail) {
-      console.log('useApproverRequests: No email provided, skipping fetch');
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
+  const query = useQuery({
+    queryKey: ['approver-requests', approverEmail],
+    queryFn: async () => {
+      if (!approverEmail) {
+        console.log('useApproverRequests: No email provided, returning empty array');
+        return [];
+      }
 
       console.log(`🔄 Fetching approver requests for email: ${approverEmail}`);
 
@@ -270,122 +232,101 @@ export function useApproverRequests(approverEmail: string) {
       }));
 
       console.log(`✅ Successfully transformed ${transformedRequests.length} approver requests`);
-      setData(transformedRequests);
+      return transformedRequests;
+    },
+    enabled: !!approverEmail,
+    staleTime: 1000 * 60 * 1, // 1 minuto - requests de approver necesitan estar frescos
+    gcTime: 1000 * 60 * 3, // 3 minutos en caché
+    refetchOnWindowFocus: true, // Importante para approvers - necesitan datos actuales
+    refetchOnMount: false,
+    retry: 2,
+  });
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch approver requests';
-      console.error('❌ Error fetching approver requests:', errorMessage);
-      setError(errorMessage);
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchApproverRequests();
-  }, [approverEmail]);
-
-  const refetch = () => {
-    fetchApproverRequests();
-  };
-
+  // Retorna interfaz compatible con el código existente
   return {
-    data,
-    isLoading,
-    error,
-    refetch,
+    data: query.data || null,
+    isLoading: query.isLoading,
+    error: query.error?.message || null,
+    refetch: query.refetch,
   } as const;
 }
 
-// Hook genérico para dashboard data (sin cambios)
+// Hook optimizado con React Query para dashboard data
 export function useDashboardData({ userRole, userEmail }: UseDashboardDataProps) {
-  const [requests, setRequests] = useState<Request[]>([])  // Tipar correctamente
-  const [stats, setStats] = useState<Stats>({ total: 0, pending: 0, approved: 0, rejected: 0 })
-  const [loading, setLoading] = useState(false)  // false por defecto
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchData = async () => {
-    // SI userRole es null, NO hacer llamadas
-    if (!userRole || !userEmail) {
-      console.log('Skipping API calls - user not authorized or missing data')
-      setLoading(false)
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError(null)
-
-      console.log(`Fetching data for role: ${userRole}, email: ${userEmail}`)
-
-      // Llamadas paralelas
-      const [requestsResult, statsResult] = await Promise.all([
-        apiClient.getRequests(userRole, userEmail),
-        apiClient.getStats(userRole, userEmail)
-      ])
-
-      // Manejar errores de requests
-      if (requestsResult.error) {
-        throw new Error(`Requests error: ${requestsResult.error}`)
+  // Hook para requests con React Query
+  const requestsQuery = useQuery({
+    queryKey: ['dashboard-requests', userRole, userEmail],
+    queryFn: async () => {
+      if (!userRole || !userEmail) {
+        throw new Error('User role or email missing')
       }
-
-      // Manejar errores de stats  
-      if (statsResult.error) {
-        throw new Error(`Stats error: ${statsResult.error}`)
+      console.log(`🔄 Fetching requests for role: ${userRole}, email: ${userEmail}`)
+      const result = await apiClient.getRequests(userRole, userEmail)
+      if (result.error) {
+        throw new Error(result.error)
       }
+      return result.data?.requests || []
+    },
+    enabled: !!(userRole && userEmail),
+    staleTime: 1000 * 60 * 5, // 5 minutos - datos del dashboard se actualizan moderadamente
+    gcTime: 1000 * 60 * 10, // 10 minutos en caché
+    refetchOnWindowFocus: true, // Sí refrescar en focus para dashboard (datos importantes)
+    refetchOnMount: false, // No refrescar si ya hay datos cached
+    retry: 2,
+  })
 
-      // Actualizar estado con datos exitosos
-      setRequests(requestsResult.data?.requests || [])
-      setStats(statsResult.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0 })
+  // Hook para stats con React Query
+  const statsQuery = useQuery({
+    queryKey: ['dashboard-stats', userRole, userEmail],
+    queryFn: async () => {
+      if (!userRole || !userEmail) {
+        throw new Error('User role or email missing')
+      }
+      console.log(`🔄 Fetching stats for role: ${userRole}, email: ${userEmail}`)
+      const result = await apiClient.getStats(userRole, userEmail)
+      if (result.error) {
+        throw new Error(result.error)
+      }
+      return result.data?.stats || { total: 0, pending: 0, approved: 0, rejected: 0 }
+    },
+    enabled: !!(userRole && userEmail),
+    staleTime: 1000 * 60 * 3, // 3 minutos - stats cambian más frecuentemente
+    gcTime: 1000 * 60 * 8, // 8 minutos en caché
+    refetchOnWindowFocus: true, // Sí refrescar stats en focus
+    refetchOnMount: false,
+    retry: 2,
+  })
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch data'
-      console.error('Dashboard data fetch error:', errorMessage)
-      setError(errorMessage)
-      
-      // Set default empty state on error
-      setRequests([])
-      setStats({ total: 0, pending: 0, approved: 0, rejected: 0 })
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Combinar loading states
+  const loading = requestsQuery.isLoading || statsQuery.isLoading
+  
+  // Combinar error states
+  const error = requestsQuery.error?.message || statsQuery.error?.message || null
 
-  useEffect(() => {
-    fetchData()
-  }, [userRole, userEmail]) // Se ejecuta cuando cambian, pero si userRole=null no hace nada
-
+  // Función de refetch combinada
   const refetch = () => {
-    fetchData()
+    requestsQuery.refetch()
+    statsQuery.refetch()
   }
 
   return {
-    requests,
-    stats,
+    requests: requestsQuery.data || [],
+    stats: statsQuery.data || { total: 0, pending: 0, approved: 0, rejected: 0 },
     loading,
     error,
     refetch
   }
 }
 
-// Hook específico para GL Coding data de una request
+// Hook optimizado con React Query para GL Coding data de una request
 export function useGLCodingByRequestId(requestId: string | null) {
-  const [data, setData] = useState<any[] | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchGLCodingData = async () => {
-    if (!requestId) {
-      console.log('useGLCodingByRequestId: No requestId provided, skipping fetch');
-      setIsLoading(false);
-      setData([]);
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      setError(null);
+  const query = useQuery({
+    queryKey: ['gl-coding', requestId],
+    queryFn: async () => {
+      if (!requestId) {
+        console.log('useGLCodingByRequestId: No requestId provided, returning empty array');
+        return [];
+      }
 
       console.log(`🔄 Fetching GL coding data for requestId: ${requestId}`);
 
@@ -404,30 +345,21 @@ export function useGLCodingByRequestId(requestId: string | null) {
       const result = await response.json();
       console.log(`✅ Successfully fetched ${result.data?.glCodingEntries?.length || 0} GL coding entries`);
       
-      setData(result.data?.glCodingEntries || []);
+      return result.data?.glCodingEntries || [];
+    },
+    enabled: !!requestId,
+    staleTime: 1000 * 60 * 10, // 10 minutos - GL coding data cambia raramente
+    gcTime: 1000 * 60 * 20, // 20 minutos en caché
+    refetchOnWindowFocus: false, // No necesario refrescar GL coding automáticamente
+    refetchOnMount: false,
+    retry: 2,
+  });
 
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch GL coding data';
-      console.error('❌ Error fetching GL coding data:', errorMessage);
-      setError(errorMessage);
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchGLCodingData();
-  }, [requestId]);
-
-  const refetch = () => {
-    fetchGLCodingData();
-  };
-
+  // Retorna interfaz compatible con el código existente
   return {
-    data,
-    isLoading,
-    error,
-    refetch,
+    data: query.data || null,
+    isLoading: query.isLoading,
+    error: query.error?.message || null,
+    refetch: query.refetch,
   } as const;
 }

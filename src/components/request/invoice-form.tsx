@@ -1,7 +1,7 @@
 // src/components/request/invoice-form.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
@@ -59,20 +59,60 @@ export default function InvoiceForm({ onSubmit, initialData, uploadPdf, pdfUploa
   const [error, setError] = useState<string | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const [pdfUploadResult, setPdfUploadResult] = useState<any>(null);
+  
+  // 🚀 Performance: Debounced company for branches API
+  const [debouncedCompany, setDebouncedCompany] = useState(formData.company);
 
   // Usar hook para obtener companies (sin fallback)
   const { data: companies, isLoading: loadingCompanies, error: companiesError } = useCompanies();
 
-  // Usar hook para obtener branches según la company seleccionada
-  const { data: branches = [], isLoading: loadingBranches, error: branchesError } = useBranches(formData.company);
+  // 🚀 Performance: Debounce company changes to reduce API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedCompany(formData.company);
+    }, 300); // 300ms delay
+    
+    return () => clearTimeout(timer);
+  }, [formData.company]);
 
-  // Helper para saber si la compañía seleccionada es TCRS
-  const isTcrsCompany = (() => {
+  // Usar hook para obtener branches con company debounced
+  const { data: branches = [], isLoading: loadingBranches, error: branchesError } = useBranches(debouncedCompany);
+
+  // 🚀 Performance: Memoize TCRS company check
+  const isTcrsCompany = useMemo(() => {
     if (!formData.company || !companies) return false;
     const selected = companies.find((c: DictionaryItem) => c.code === formData.company);
     // Puedes ajustar la lógica según tu base de datos: por code o description
     return selected?.description?.toUpperCase().includes("TCRS") || selected?.code?.toUpperCase() === "TCRS";
-  })();
+  }, [formData.company, companies]);
+
+  // 🚀 Performance: Memoize company dropdown options
+  const companyOptions = useMemo(() => {
+    if (!companies) return [];
+    return companies.map((company: DictionaryItem) => (
+      <option key={company.code} value={company.code}>
+        {company.description}
+      </option>
+    ));
+  }, [companies]);
+
+  // 🚀 Performance: Memoize branch dropdown options
+  const branchOptions = useMemo(() => {
+    if (!branches || branches.length === 0) return [];
+    return branches.map((branch: DictionaryItem) => (
+      <option key={branch.code} value={branch.code}>
+        {branch.description}
+      </option>
+    ));
+  }, [branches]);
+
+  // 🚀 Performance: Skeleton loader component
+  const SkeletonSelect = () => (
+    <div className="animate-pulse">
+      <div className="h-4 bg-gray-200 rounded mb-2 w-1/3"></div>
+      <div className="h-10 bg-gray-200 rounded w-full"></div>
+    </div>
+  );
 
   const handleInputChange = (field: keyof InvoiceData, value: any) => {
     setFormData(prev => {
@@ -191,78 +231,82 @@ export default function InvoiceForm({ onSubmit, initialData, uploadPdf, pdfUploa
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Company Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Company *
-            </label>
-            <div className="relative">
-              <select
-                value={formData.company}
-                onChange={(e) => handleInputChange('company', e.target.value)}
-                disabled={loadingCompanies}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                required
-              >
-                <option value="">
-                  {loadingCompanies
-                    ? "Loading companies..."
-                    : companiesError
-                    ? "Error loading companies"
-                    : "Select Company"}
-                </option>
-                {companies && companies.map((company: DictionaryItem) => (
-                  <option key={company.code} value={company.code}>
-                    {company.description}
-                  </option>
-                ))}
-              </select>
-              {loadingCompanies && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <LoadingSpinner size="sm" />
+            {loadingCompanies && !companies ? (
+              <SkeletonSelect />
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Company *
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.company}
+                    onChange={(e) => handleInputChange('company', e.target.value)}
+                    disabled={loadingCompanies}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
+                  >
+                    <option value="">
+                      {loadingCompanies
+                        ? "Refreshing..."
+                        : companiesError
+                        ? "Error loading companies"
+                        : "Select Company"}
+                    </option>
+                    {companyOptions}
+                  </select>
+                  {loadingCompanies && companies && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            {companiesError && (
-              <p className="text-xs text-red-600 mt-1">
-                Could not load companies. Please try again later.
-              </p>
+                {companiesError && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Could not load companies. Please try again later.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
           {/* Branch Dropdown (Dependent on Company) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Branch *
-            </label>
-            <div className="relative">
-              <select
-                value={formData.branch}
-                onChange={(e) => handleInputChange('branch', e.target.value)}
-                disabled={!formData.company || loadingBranches}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
-                required
-              >
-                <option value="">
-                  {!formData.company
-                    ? "Select Company first"
-                    : loadingBranches
-                    ? "Loading branches..."
-                    : branchesError
-                    ? "Error loading branches"
-                    : "Select Branch"
-                  }
-                </option>
-                {branches.map((branch: DictionaryItem) => (
-                  <option key={branch.code} value={branch.code}>
-                    {branch.description}
-                  </option>
-                ))}
-              </select>
-              {loadingBranches && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <LoadingSpinner size="sm" />
+            {loadingBranches && formData.company && !branches.length ? (
+              <SkeletonSelect />
+            ) : (
+              <>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Branch *
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.branch}
+                    onChange={(e) => handleInputChange('branch', e.target.value)}
+                    disabled={!formData.company || loadingBranches}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
+                  >
+                    <option value="">
+                      {!formData.company
+                        ? "Select Company first"
+                        : loadingBranches
+                        ? "Loading branches..."
+                        : branchesError
+                        ? "Error loading branches"
+                        : "Select Branch"
+                      }
+                    </option>
+                    {branchOptions}
+                  </select>
+                  {loadingBranches && formData.company && branches.length > 0 && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                      <LoadingSpinner size="sm" />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
             {!formData.company && (
               <p className="text-xs text-gray-500 mt-1">Please select a company first</p>
             )}
@@ -403,10 +447,19 @@ export default function InvoiceForm({ onSubmit, initialData, uploadPdf, pdfUploa
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={loading || loadingCompanies || loadingBranches}
+            disabled={loading || loadingCompanies || loadingBranches || pdfUploading}
             className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? <LoadingSpinner size="sm" /> : 'Continue'}
+            {pdfUploading ? (
+              <div className="flex items-center space-x-2">
+                <LoadingSpinner size="sm" />
+                <span>Uploading PDF...</span>
+              </div>
+            ) : loading ? (
+              <LoadingSpinner size="sm" />
+            ) : (
+              'Continue'
+            )}
           </button>
         </div>
       </form>

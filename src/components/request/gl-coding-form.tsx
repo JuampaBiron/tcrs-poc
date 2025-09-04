@@ -29,6 +29,7 @@ interface GLCodingFormProps {
   }) => void;
   onBack: () => void;
   initialData?: GLCodingEntry[];
+  externalLoading?: boolean; // New prop to control loading from parent
 }
 
 // Entry validation function
@@ -72,7 +73,8 @@ export default function GLCodingForm({
   invoiceAmount,
   onSubmit,
   onBack,
-  initialData = []
+  initialData = [],
+  externalLoading = false
 }: GLCodingFormProps) {
   // State
   const [entries, setEntries] = useState<GLCodingEntry[]>(
@@ -176,36 +178,25 @@ export default function GLCodingForm({
   }, [selectedRows]);
 
   // Submit handler
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(() => {
     if (!isFormValid) {
       setError('Please fix all validation errors before submitting');
       return;
     }
 
-    try {
-      setLoading(true);
-      setError(null);
-      
-      console.log('Submitting GL coding data:', {
-        entriesCount: entries.length,
-        hasExcelFile: !!excelFile,
-        excelFileName: excelFileName
-      });
+    setError(null);
+    
+    console.log('Submitting GL coding data:', {
+      entriesCount: entries.length,
+      hasExcelFile: !!excelFile,
+      excelFileName: excelFileName
+    });
 
-      // Add a minimum delay to show the spinner
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      onSubmit({ 
-        entries: entries,
-        excelFile: excelFile || undefined
-      });
-      
-    } catch (err) {
-      console.error('Submit failed:', err);
-      setError(`Failed to submit GL coding data: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
+    // Let parent handle loading state and navigation
+    onSubmit({ 
+      entries: entries,
+      excelFile: excelFile || undefined
+    });
   }, [entries, excelFile, isFormValid, onSubmit, excelFileName]);
 
   // Clear Excel data
@@ -425,17 +416,17 @@ export default function GLCodingForm({
           
           <button
             onClick={handleSubmit}
-            disabled={!isFormValid || loading}
+            disabled={!isFormValid || loading || externalLoading}
             className={`px-6 py-2 rounded-md font-medium flex items-center justify-center gap-2 ${
-              isFormValid && !loading
+              isFormValid && !loading && !externalLoading
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}
           >
-            {loading ? (
+            {(loading || externalLoading) ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Processing...
+                {externalLoading ? 'Uploading...' : 'Processing...'}
               </>
             ) : (
               'Continue to Validation'

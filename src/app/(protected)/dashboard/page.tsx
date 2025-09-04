@@ -3,6 +3,7 @@
 
 import { useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
+import { RefreshCcw } from "lucide-react";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import {
   apiClient,
@@ -32,6 +33,7 @@ export default function DashboardPage() {
     branch: "",
   });
   const [exportLoading, setExportLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Cast session role to UserRole safely
   const userRole = session?.user?.role as UserRole;
@@ -91,6 +93,19 @@ export default function DashboardPage() {
     setSearchQuery("");
   };
 
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      console.log('🔄 Refreshing dashboard data...');
+      await refetch();
+      console.log('✅ Dashboard data refreshed successfully');
+    } catch (error) {
+      console.error('❌ Error refreshing dashboard data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleExport = async () => {
     if (!userEmail || !userRole) return;
     
@@ -148,10 +163,25 @@ export default function DashboardPage() {
     <div className="p-6">
       {/* Page Title */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">
-          Overview of approval requests in the system
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-600">
+              Overview of approval requests in the system
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+            className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Refresh dashboard data"
+          >
+            <RefreshCcw 
+              className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} 
+            />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
+          </button>
+        </div>
       </div>
 
       {/* Dashboard Metrics - Show for all roles */}

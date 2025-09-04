@@ -73,6 +73,8 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
 
   const handleGLCodingSubmit = async (data: { entries: GLCodingEntry[], excelFile?: File }) => {
     try {
+      setLoading(true); // Start loading state
+      setError(null);
       setGLCodingData(data.entries);
 
       if (data.excelFile) {
@@ -89,11 +91,14 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
         setExcelUploadResult(null);
       }
 
+      // Navigation and clear loading state
       setCurrentStep('validation');
-      setError(null);
+      setLoading(false);
+      
     } catch (err) {
       console.error('❌ Excel upload failed during GL submit:', err);
       setError(`Failed to upload Excel: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setLoading(false); // Reset loading only on error
     }
   };
 
@@ -363,6 +368,7 @@ export default function RequesterView({ userEmail, user }: RequesterViewProps) {
               onSubmit={handleGLCodingSubmit}
               onBack={handleBackToInvoice}
               initialData={glCodingData.length > 0 ? glCodingData : undefined}
+              externalLoading={loading}
             />
           )}
 
