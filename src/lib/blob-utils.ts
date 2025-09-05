@@ -1,5 +1,5 @@
 // src/lib/blob-utils.ts - CENTRALIZED AZURE BLOB UTILITIES
-import { BlobServiceClient, BlobClient } from '@azure/storage-blob';
+import { BlobServiceClient, BlobClient, generateBlobSASQueryParameters, BlobSASPermissions, StorageSharedKeyCredential } from '@azure/storage-blob';
 import { 
   generateOptimizedBlobPath, 
   generateTempBlobPath, 
@@ -732,6 +732,66 @@ export async function createOptimizedBlob(
     
   } catch (error) {
     console.error(`❌ Failed to create optimized blob:`, error)
+    throw error
+  }
+}
+
+// ========================================
+// SAS URL GENERATION
+// ========================================
+
+/**
+ * Generates a SAS URL for secure blob access
+ * @param blobUrl - Full blob URL
+ * @param expirationMinutes - Minutes until URL expires (default: 60)
+ * @returns Signed URL with SAS token
+ */
+export async function generateBlobSASUrl(
+  blobUrl: string, 
+  expirationMinutes: number = 60
+): Promise<string> {
+  console.log(`🔐 Generating SAS URL for blob access...`)
+  console.log(`   └── Blob URL: ${blobUrl}`)
+  console.log(`   └── Expiration: ${expirationMinutes} minutes`)
+  
+  try {
+    const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+    const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+    const containerName = getContainerName();
+    
+    if (!accountName || !accountKey) {
+      throw new Error('Azure Storage credentials not configured for SAS generation');
+    }
+    
+    // Extract blob name from URL
+    const blobName = extractBlobNameFromUrl(blobUrl);
+    console.log(`   └── Blob name: ${blobName}`)
+    
+    // Create credentials
+    const sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+    
+    // Set expiration time
+    const startsOn = new Date();
+    const expiresOn = new Date(startsOn.getTime() + (expirationMinutes * 60 * 1000));
+    
+    // Generate SAS token with read permissions
+    const sasToken = generateBlobSASQueryParameters({
+      containerName,
+      blobName,
+      permissions: BlobSASPermissions.parse('r'), // Read permission only
+      startsOn,
+      expiresOn,
+    }, sharedKeyCredential).toString();
+    
+    const sasUrl = `${blobUrl}?${sasToken}`;
+    
+    console.log(`✅ SAS URL generated successfully`)
+    console.log(`   └── Expires at: ${expiresOn.toISOString()}`)
+    
+    return sasUrl;
+    
+  } catch (error) {
+    console.error(`❌ Failed to generate SAS URL:`, error)
     throw error
   }
 }

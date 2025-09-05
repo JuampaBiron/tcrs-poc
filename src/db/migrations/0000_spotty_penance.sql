@@ -17,6 +17,8 @@ CREATE TABLE "accounts" (
 	"account_code" varchar(255) PRIMARY KEY NOT NULL,
 	"account_description" varchar(255),
 	"account_combined" varchar(255),
+	"created_by" varchar(255),
+	"updated_by" varchar(255),
 	"created_date" timestamp DEFAULT now(),
 	"modified_date" timestamp
 );
@@ -43,6 +45,11 @@ CREATE TABLE "approver_list" (
 	"email_address" varchar(255),
 	"back_up_approver" varchar(255),
 	"back_up_email_address" varchar(255),
+	"send_to_backup" boolean DEFAULT false,
+	"created_by" varchar(255),
+	"updated_by" varchar(255),
+	"created_date" timestamp DEFAULT now(),
+	"modified_date" timestamp,
 	CONSTRAINT "unique_authorized_approver_branch" UNIQUE("authorized_approver","branch")
 );
 --> statement-breakpoint
@@ -50,6 +57,8 @@ CREATE TABLE "facility" (
 	"facility_code" varchar(255) PRIMARY KEY NOT NULL,
 	"facility_description" varchar(255),
 	"facility_combined" varchar(255),
+	"created_by" varchar(255),
+	"updated_by" varchar(255),
 	"created_date" timestamp DEFAULT now(),
 	"modified_date" timestamp
 );

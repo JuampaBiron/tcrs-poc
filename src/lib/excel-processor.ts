@@ -86,9 +86,6 @@ export class ExcelProcessor {
         if (!entry.taxCode) {
           warnings.push(`Row ${rowNum}: Tax Code is empty`);
         }
-        if (!entry.equipment && entry.accountCode.startsWith('2')) {
-          warnings.push(`Row ${rowNum}: Equipment # recommended for account codes starting with '2'`);
-        }
 
         entries.push(entry);
       });

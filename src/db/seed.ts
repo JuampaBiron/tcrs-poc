@@ -223,40 +223,7 @@ const initialWorkflowSteps: NewWorkflowStep[] = [
   }
 ]
 
-// Sample approval requests for testing
-const sampleRequests: NewApprovalRequest[] = [
-  {
-    requester: "test@sisuadigital.com",
-    assignedApprover: "RERASMUS@FINNING.COM", 
-    approverStatus: REQUEST_STATUS.PENDING,
-    comments: "TCRS - Branch 402 - Vendor A - PO-12345 - Invoice $2,500 CAD"
-  },
-  {
-    requester: "test@sisuadigital.com",
-    assignedApprover: "jason.kreye@finning.com",
-    approverStatus: REQUEST_STATUS.PENDING, 
-    comments: "TCRS - Branch 402 - Vendor B - PO-67890 - Invoice $1,800 CAD"
-  },
-  {
-    requester: "user2@sisuadigital.com",
-    assignedApprover: "ntokugawa@finning.com",
-    approverStatus: REQUEST_STATUS.APPROVED,
-    comments: "TCRS - Branch 404 - Vendor C - PO-54321 - Invoice $4,200 CAD",
-    approvedDate: new Date()
-  },
-  {
-    requester: "user3@sisuadigital.com", 
-    assignedApprover: "smullins@finning.com",
-    approverStatus: REQUEST_STATUS.PENDING,
-    comments: "TCRS - Branch 406 - Vendor D - PO-98765 - Invoice $3,100 CAD"
-  },
-  {
-    requester: "test@sisuadigital.com",
-    assignedApprover: "Megan.Bergersen@finning.com",
-    approverStatus: REQUEST_STATUS.REJECTED,
-    comments: "Sitech - Branch 500 - Vendor E - PO-11111 - Invoice $5,600 CAD - Missing documentation"
-  }
-]
+
 
 // ===== CSV PARSING UTILITIES =====
 function parseCSV(csvContent: string): Record<string, string>[] {
@@ -526,29 +493,6 @@ export async function seedApproverList() {
   }
 }
 
-export async function seedSampleRequests() {
-  console.log("🌱 Seeding sample approval requests...")
-  
-  try {
-    // Check if requests already exist
-    const existingRequests = await db.select().from(approvalRequests).limit(1)
-    
-    if (existingRequests.length > 0) {
-      console.log("✅ Sample requests already exist, skipping seed")
-      return
-    }
-
-    // Insert sample requests
-    const result = await db.insert(approvalRequests).values(sampleRequests).returning()
-    
-    console.log(`✅ Successfully seeded ${result.length} sample requests`)
-    console.log("📊 Request statuses:", result.map(r => `${r.approverStatus}: ${r.comments?.substring(0, 50)}...`))
-    
-  } catch (error) {
-    console.error("❌ Error seeding sample requests:", error)
-    throw error
-  }
-}
 
 // ===== COMPLETE RESET FUNCTION =====
 export async function resetDatabase() {
@@ -573,10 +517,6 @@ export async function resetDatabase() {
     await seedAccountsMaster()
     await seedFacilityMaster()
     await seedApproverList()
-    
-    // 4. Seed sample transactional data
-    console.log("\n📝 Seeding sample transactional data...")
-    await seedSampleRequests()
     
     console.log("\n✅ Database reset and seeding completed successfully!")
     console.log("🎯 Summary:")
@@ -612,9 +552,6 @@ export async function seedDatabase() {
     await seedAccountsMaster()
     await seedFacilityMaster()
     await seedApproverList()
-    
-    console.log("\n📝 Seeding sample transactional data...")
-    await seedSampleRequests()
     
     console.log("\n✅ Database seeding completed successfully!")
     console.log("🎯 Summary:")

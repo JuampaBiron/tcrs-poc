@@ -21,6 +21,7 @@ interface PendingRequest {
   vendor: string;
   po?: string;
   status: RequestStatus;
+  blobUrl?: string;
 }
 
 interface GLCodingDetail {
@@ -54,6 +55,44 @@ export default function RequestDetailsModal({
   const [comments, setComments] = useState('');
   const [glCodingDetails, setGLCodingDetails] = useState<GLCodingDetail[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [actionCompleted, setActionCompleted] = useState(false);
+
+  const handleDownloadPDF = async () => {
+    if (!request.blobUrl) return;
+    
+    try {
+      // Call API to get SAS URL
+      const response = await fetch('/api/invoices/download-pdf', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          blobUrl: request.blobUrl,
+          requestId: request.requestId
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate download URL');
+      }
+
+      const data = await response.json();
+      
+      // Create a temporary anchor element to trigger download
+      const link = document.createElement('a');
+      link.href = data.data.sasUrl;
+      link.download = `invoice-${request.requestId}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
+    }
+  };
 
   // Mock GL Coding data - in real app, this would be fetched
   const mockGLCoding: GLCodingDetail[] = [
@@ -79,14 +118,26 @@ export default function RequestDetailsModal({
     }
   ];
 
-  const handleAction = () => {
-    if (action === 'approve') {
-      onApprove(comments);
-    } else if (action === 'reject') {
-      onReject(comments);
+  const handleAction = async () => {
+    try {
+      if (action === 'approve') {
+        await onApprove(comments);
+      } else if (action === 'reject') {
+        await onReject(comments);
+      }
+      
+      // Si llegamos aquí, la acción fue exitosa
+      setActionCompleted(true);
+      
+      // Cerrar modal después de un breve delay para mostrar éxito
+      setTimeout(() => {
+        onClose();
+      }, 1500);
+      
+    } catch (error) {
+      // El error se maneja en el componente padre
+      console.error('Error in action:', error);
     }
-    setAction(null);
-    setComments('');
   };
 
   const formatAmount = (amount: string, currency: string) => {
@@ -257,9 +308,16 @@ export default function RequestDetailsModal({
               <div className="border border-gray-200 rounded-lg p-4 text-center">
                 <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
                 <p className="text-sm text-gray-600">Invoice PDF</p>
-                <button className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium">
-                  Download PDF
-                </button>
+                {request.blobUrl ? (
+                  <button 
+                    onClick={handleDownloadPDF}
+                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
+                  >
+                    Download PDF
+                  </button>
+                ) : (
+                  <p className="mt-2 text-gray-400 text-sm">No PDF available</p>
+                )}
               </div>
             </div>
           )}
@@ -317,15 +375,25 @@ export default function RequestDetailsModal({
                 </button>
                 <button
                   onClick={handleAction}
-                  disabled={loading || (action === 'reject' && !comments.trim())}
-                  className={`px-4 py-2 rounded-md flex items-center ${
-                    action === 'approve'
-                      ? 'bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-400'
-                      : 'bg-red-600 text-white hover:bg-red-700 disabled:bg-gray-400'
-                  }`}
+                  disabled={loading || actionCompleted || (action === 'reject' && !comments.trim())}
+                  className={`px-4 py-2 rounded-md flex items-center justify-center min-w-[160px] ${
+                    actionCompleted
+                      ? 'bg-gray-600 text-white'
+                      : action === 'approve'
+                        ? 'bg-green-600 text-white hover:bg-green-700 disabled:bg-green-400'
+                        : 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-400'
+                  } ${loading || actionCompleted ? 'cursor-not-allowed' : ''}`}
                 >
-                  {loading ? (
-                    <LoadingSpinner />
+                  {actionCompleted ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2 text-green-400" />
+                      {action === 'approve' ? 'Approved!' : 'Rejected!'}
+                    </>
+                  ) : loading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      {action === 'approve' ? 'Approving...' : 'Rejecting...'}
+                    </>
                   ) : (
                     <>
                       {action === 'approve' ? <Check className="w-4 h-4 mr-2" /> : <Ban className="w-4 h-4 mr-2" />}

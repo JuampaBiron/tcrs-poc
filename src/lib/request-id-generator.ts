@@ -3,50 +3,33 @@ import { desc, sql } from "drizzle-orm"
 import { db, approvalRequests } from "@/db"
 
 /**
- * Generates a unique Request ID in format: TCRS-YYYY-NNNNNN
- * Example: TCRS-2024-000001, TCRS-2024-000123
+ * Generates a unique Request ID as a 12-digit incremental number using PostgreSQL sequence
+ * Example: 000000000001, 000000000123
  */
 export async function generateRequestId(): Promise<string> {
-  const currentYear = new Date().getFullYear()
-  
   try {
-    // Get the last request ID for current year
-    const lastRequest = await db
-      .select({ requestId: approvalRequests.requestId })
-      .from(approvalRequests)
-      .where(sql`${approvalRequests.requestId} LIKE ${`TCRS-${currentYear}-%`}`)
-      .orderBy(desc(approvalRequests.createdDate))
-      .limit(1)
+    // Use PostgreSQL sequence for atomic increment
+    const result = await db.execute(sql`SELECT nextval('request_id_sequence') as next_id`)
     
-    let nextSerial = 1
-    
-    if (lastRequest.length > 0 && lastRequest[0].requestId) {
-      // Extract serial number from last ID: TCRS-2024-000123 -> 000123
-      const parts = lastRequest[0].requestId.split('-')
-      if (parts.length === 3) {
-        const serialPart = parts[2]
-        const currentSerial = parseInt(serialPart, 10)
-        if (!isNaN(currentSerial)) {
-          nextSerial = currentSerial + 1
-        }
-      }
+    if (result.rows.length === 0 || !result.rows[0].next_id) {
+      throw new Error('Failed to get next sequence value')
     }
     
-    // Format with 6-digit padding
-    const paddedSerial = nextSerial.toString().padStart(6, '0')
+    const nextSerial = parseInt(result.rows[0].next_id as string, 10)
     
-    const requestId = `TCRS-${currentYear}-${paddedSerial}`
+    // Format with 12-digit padding
+    const requestId = nextSerial.toString().padStart(12, '0')
     
-    console.log(`🆔 Generated Request ID: ${requestId}`)
+    console.log(`🆔 Generated Request ID: ${requestId} (sequence: ${nextSerial})`)
     
     return requestId
     
   } catch (error) {
     console.error('❌ Error generating Request ID:', error)
     
-    // Fallback: use timestamp-based ID if database query fails
-    const timestamp = Date.now().toString().slice(-6)
-    const fallbackId = `TCRS-${currentYear}-${timestamp}`
+    // Fallback: use timestamp-based ID if sequence fails
+    const timestamp = Date.now()
+    const fallbackId = timestamp.toString().padStart(12, '0')
     
     console.log(`⚠️ Using fallback Request ID: ${fallbackId}`)
     
@@ -55,111 +38,73 @@ export async function generateRequestId(): Promise<string> {
 }
 
 /**
- * Validates if a Request ID follows the correct format
+ * Validates if a Request ID follows the correct format (12 digits)
  */
 export function isValidRequestId(requestId: string): boolean {
-  const pattern = /^TCRS-\d{4}-\d{6}$/
+  const pattern = /^\d{12}$/
   return pattern.test(requestId)
 }
 
 /**
- * Extracts year from Request ID
+ * Converts Request ID to number (for sorting and comparison)
  */
-export function getYearFromRequestId(requestId: string): number | null {
+export function getNumberFromRequestId(requestId: string): number | null {
   if (!isValidRequestId(requestId)) return null
   
-  const parts = requestId.split('-')
-  const year = parseInt(parts[1], 10)
-  
-  return isNaN(year) ? null : year
+  const num = parseInt(requestId, 10)
+  return isNaN(num) ? null : num
 }
 
 /**
- * Extracts serial number from Request ID
- */
-export function getSerialFromRequestId(requestId: string): number | null {
-  if (!isValidRequestId(requestId)) return null
-  
-  const parts = requestId.split('-')
-  const serial = parseInt(parts[2], 10)
-  
-  return isNaN(serial) ? null : serial
-}
-
-/**
- * Cache for last serial numbers to optimize frequent generations
- * Reset cache when year changes
- */
-const serialCache = new Map<number, number>()
-
-/**
- * Optimized version of generateRequestId with caching
+ * Optimized version of generateRequestId - uses the same sequence
+ * (sequence already handles caching and optimization)
  * Use this for high-frequency request creation
  */
 export async function generateRequestIdOptimized(): Promise<string> {
-  const currentYear = new Date().getFullYear()
-  
-  try {
-    // Check if we have cached serial for current year
-    if (!serialCache.has(currentYear)) {
-      const lastSerial = await getLastSerialForYear(currentYear)
-      serialCache.set(currentYear, lastSerial)
-    }
-    
-    // Increment and cache new serial
-    const nextSerial = serialCache.get(currentYear)! + 1
-    serialCache.set(currentYear, nextSerial)
-    
-    // Format with 6-digit padding
-    const paddedSerial = nextSerial.toString().padStart(6, '0')
-    const requestId = `TCRS-${currentYear}-${paddedSerial}`
-    
-    console.log(`🆔 Generated Request ID (cached): ${requestId}`)
-    
-    return requestId
-    
-  } catch (error) {
-    console.error('❌ Error in optimized Request ID generation:', error)
-    
-    // Fallback to regular generation
-    return generateRequestId()
-  }
+  // Since PostgreSQL sequence already handles optimization and caching,
+  // we can just use the main function
+  return generateRequestId()
 }
 
 /**
- * Helper function to get last serial number for a specific year
+ * Gets the current sequence value without incrementing
+ * Useful for debugging or status checks
  */
-async function getLastSerialForYear(year: number): Promise<number> {
+export async function getCurrentSequenceValue(): Promise<number | null> {
   try {
-    const lastRequest = await db
-      .select({ requestId: approvalRequests.requestId })
-      .from(approvalRequests)
-      .where(sql`${approvalRequests.requestId} LIKE ${`TCRS-${year}-%`}`)
-      .orderBy(desc(approvalRequests.createdDate))
-      .limit(1)
+    const result = await db.execute(sql`SELECT currval('request_id_sequence') as current_id`)
     
-    if (lastRequest.length === 0 || !lastRequest[0].requestId) {
-      return 0 // Start from 1 (will be incremented)
+    if (result.rows.length === 0 || !result.rows[0].current_id) {
+      return null
     }
     
-    const parts = lastRequest[0].requestId.split('-')
-    if (parts.length !== 3) return 0
-    
-    const serialPart = parts[2]
-    const currentSerial = parseInt(serialPart, 10)
-    
-    return isNaN(currentSerial) ? 0 : currentSerial
+    return parseInt(result.rows[0].current_id as string, 10)
     
   } catch (error) {
-    console.error('❌ Error getting last serial for year:', year, error)
-    return 0
+    console.error('❌ Error getting current sequence value:', error)
+    return null
   }
 }
 
 /**
- * Clear cache - useful for testing or year transitions
+ * Resets the sequence to a specific value
+ * Use with caution - only for maintenance or migration purposes
+ */
+export async function resetSequenceTo(value: number): Promise<boolean> {
+  try {
+    await db.execute(sql`SELECT setval('request_id_sequence', ${value}, false)`)
+    console.log(`🔄 Sequence reset to: ${value}`)
+    return true
+  } catch (error) {
+    console.error('❌ Error resetting sequence:', error)
+    return false
+  }
+}
+
+/**
+ * Clear cache - no-op since we're using sequence now
+ * Kept for compatibility
  */
 export function clearRequestIdCache(): void {
-  serialCache.clear()
-  console.log('🧹 Request ID cache cleared')
+  console.log('🧹 Request ID cache cleared (no-op - using sequence)')
 }

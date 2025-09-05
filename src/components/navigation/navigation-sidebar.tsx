@@ -85,12 +85,10 @@ export default function DashboardSidebar({
       return;
     }
     
-    // Only show loading for dashboard and request routes
-    if (href === '/dashboard' || href === '/request') {
-      setLoadingRoute(href);
-      router.push(href);
-      // Loading state will be cleared by useEffect when pathname changes
-    }
+    // Show loading for all navigation routes and actually navigate
+    setLoadingRoute(href);
+    router.push(href);
+    // Loading state will be cleared by useEffect when pathname changes
   };
 
   return (

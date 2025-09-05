@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { User } from "next-auth";
-import { Eye, Check, X, Clock, FileText, DollarSign, User as UserIcon } from "lucide-react";
+import { Eye, Check, X, Clock, FileText, DollarSign, User as UserIcon, RefreshCw } from "lucide-react";
 import { REQUEST_STATUS, USER_ROLES } from "@/constants";
 import ErrorMessage from "@/components/ui/error-message";
 import LoadingSpinner from "@/components/ui/loading-spinner";
@@ -26,6 +26,7 @@ interface PendingRequest {
   po?: string;
   status: RequestStatus;
   priority?: 'high' | 'medium' | 'low';
+  blobUrl?: string;
 }
 
 interface ApproverViewProps {
@@ -101,8 +102,7 @@ export default function ApproverView({ userEmail, user, userRole }: ApproverView
       // Refresh the requests list
       await loadPendingRequests();
       
-      // Close modal if open
-      setSelectedRequest(null);
+      // Don't close modal immediately - let the modal handle its own closing
 
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${action} request`);
@@ -158,6 +158,17 @@ export default function ApproverView({ userEmail, user, userRole }: ApproverView
             }`}
           >
             All
+          </button>
+          <button
+            onClick={loadPendingRequests}
+            disabled={loading}
+            className={`px-3 py-2 text-sm font-medium rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2 ${
+              loading ? 'cursor-not-allowed' : ''
+            }`}
+            title="Refresh requests"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
           </button>
         </div>
       </div>

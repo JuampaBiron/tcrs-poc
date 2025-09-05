@@ -99,6 +99,12 @@ export const approverList = pgTable('approver_list',
     emailAddress: varchar('email_address', { length: 255 }),
     backUpApprover: varchar('back_up_approver', { length: 255 }),
     backUpEmailAddress: varchar('back_up_email_address', { length: 255 }),
+    sendToBackup: boolean('send_to_backup').default(false),
+    // Audit fields
+    createdBy: varchar('created_by', { length: 255 }),
+    updatedBy: varchar('updated_by', { length: 255 }),
+    createdDate: timestamp('created_date').defaultNow(),
+    modifiedDate: timestamp('modified_date'),
   },
   (table) => ({
     uniqueAuthorizedApproverBranch: unique('unique_authorized_approver_branch').on(table.authorizedApprover, table.branch),
@@ -146,6 +152,9 @@ export const accountsMaster = pgTable('accounts', {
   accountCode: varchar('account_code', { length: 255 }).primaryKey(),
   accountDescription: varchar('account_description', { length: 255 }),
   accountCombined: varchar('account_combined', { length: 255 }),
+  // Audit fields
+  createdBy: varchar('created_by', { length: 255 }),
+  updatedBy: varchar('updated_by', { length: 255 }),
   createdDate: timestamp('created_date').defaultNow(),
   modifiedDate: timestamp('modified_date'),
 })
@@ -155,6 +164,9 @@ export const facility = pgTable('facility', {
   facilityCode: varchar('facility_code', { length: 255 }).primaryKey(),
   facilityDescription: varchar('facility_description', { length: 255 }),
   facilityCombined: varchar('facility_combined', { length: 255 }),
+  // Audit fields
+  createdBy: varchar('created_by', { length: 255 }),
+  updatedBy: varchar('updated_by', { length: 255 }),
   createdDate: timestamp('created_date').defaultNow(),
   modifiedDate: timestamp('modified_date'),
 })

@@ -1,0 +1,14 @@
+{
+  "id": "0001_request_id_sequence",
+  "prevId": "0000_spotty_penance", 
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {},
+  "enums": {},
+  "schemas": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -5,7 +5,8 @@
       "Bash(npm run dev:*)",
       "Bash(mkdir:*)",
       "Bash(mv:*)",
-      "Bash(rmdir:*)"
+      "Bash(rmdir:*)",
+      "Read(/C:\\Users\\JuanPabloBiron\\sisua\\finning\\tcrs-poc\\src\\components\\dashboard/**)"
     ],
     "deny": []
   }

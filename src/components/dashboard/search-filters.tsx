@@ -1,10 +1,15 @@
 // src/components/dashboard/search-filters.tsx
 "use client";
 
-import { Search, Download, X } from "lucide-react";
+import { Search, Download, X, Calendar } from "lucide-react";
 import { FilterState, UserRole } from "@/types";
-import { REQUEST_STATUS } from "@/constants";
+import { REQUEST_STATUS, FILTER_OPTIONS } from "@/constants";
 import { useState } from "react";
+
+interface DropdownOption {
+  value: string;
+  label: string;
+}
 
 interface SearchFiltersProps {
   onSearch: (query: string) => void;
@@ -16,6 +21,8 @@ interface SearchFiltersProps {
   requestsCount?: number;
   totalRequestsCount?: number;
   currentFilters: FilterState;
+  uniqueCompanies: DropdownOption[];
+  uniqueBranches: DropdownOption[];
 }
 
 export default function SearchFilters({
@@ -27,7 +34,9 @@ export default function SearchFilters({
   exportLoading,
   requestsCount = 0,
   totalRequestsCount,
-  currentFilters
+  currentFilters,
+  uniqueCompanies,
+  uniqueBranches
 }: SearchFiltersProps) {
   const [searchTerm, setSearchTerm] = useState("");
 
@@ -50,79 +59,56 @@ export default function SearchFilters({
 
   // Verificar si hay filtros aplicados
   const hasActiveFilters = searchTerm || 
+    currentFilters.requestId ||
+    currentFilters.company ||
+    currentFilters.branch ||
     currentFilters.status || 
+    currentFilters.submittedOnFrom ||
+    currentFilters.submittedOnTo ||
     currentFilters.dateRange || 
-    currentFilters.amount || 
-    currentFilters.branch;
+    currentFilters.amount;
 
   // Contar filtros activos
   const activeFiltersCount = [
+    currentFilters.requestId,
+    currentFilters.company,
+    currentFilters.branch,
     currentFilters.status,
+    currentFilters.submittedOnFrom,
+    currentFilters.submittedOnTo,
     currentFilters.dateRange, 
-    currentFilters.amount,
-    currentFilters.branch
+    currentFilters.amount
   ].filter(Boolean).length + (searchTerm ? 1 : 0);
 
   return (
     <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-      {/* Search Bar */}
-      <div className="flex flex-col lg:flex-row gap-4 mb-4">
-        <div className="flex-1">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search requests..."
-              value={searchTerm}
-              onChange={handleSearchChange}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-      </div>
 
-      {/* Filter Options */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+      {/* Filter Options - Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-          <select 
-            value={currentFilters.status}
-            onChange={(e) => handleFilterChange("status", e.target.value)}
+          <label className="block text-sm font-medium text-gray-700 mb-1">Request ID</label>
+          <input
+            type="text"
+            placeholder="Enter request ID..."
+            value={currentFilters.requestId}
+            onChange={(e) => handleFilterChange("requestId", e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">All Status</option>
-            <option value={REQUEST_STATUS.APPROVED}>Approved</option>
-            <option value={REQUEST_STATUS.PENDING}>Pending</option>
-            <option value={REQUEST_STATUS.IN_REVIEW}>In Review</option>
-            <option value={REQUEST_STATUS.REJECTED}>Rejected</option>
-          </select>
+          />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date Range</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
           <select 
-            value={currentFilters.dateRange}
-            onChange={(e) => handleFilterChange("dateRange", e.target.value)}
+            value={currentFilters.company}
+            onChange={(e) => handleFilterChange("company", e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
-            <option value="">All Dates</option>
-            <option value="last7days">Last 7 days</option>
-            <option value="last30days">Last 30 days</option>
-            <option value="last90days">Last 90 days</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Amount Range</label>
-          <select 
-            value={currentFilters.amount}
-            onChange={(e) => handleFilterChange("amount", e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">All Amounts</option>
-            <option value="under1000">Under $1,000</option>
-            <option value="1000to5000">$1,000 - $5,000</option>
-            <option value="over5000">Over $5,000</option>
+            <option value="">All Companies</option>
+            {uniqueCompanies.map(company => (
+              <option key={company.value} value={company.value}>
+                {company.label}
+              </option>
+            ))}
           </select>
         </div>
 
@@ -134,10 +120,57 @@ export default function SearchFilters({
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="">All Branches</option>
-            <option value="branch1">Branch 1</option>
-            <option value="branch2">Branch 2</option>
-            <option value="sitech">Sitech</option>
+            {uniqueBranches.map(branch => (
+              <option key={branch.value} value={branch.value}>
+                {branch.label}
+              </option>
+            ))}
           </select>
+        </div>
+      </div>
+
+      {/* Filter Options - Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+          <select 
+            value={currentFilters.status}
+            onChange={(e) => handleFilterChange("status", e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">All Status</option>
+            {FILTER_OPTIONS.STATUSES.map(status => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Submitted From</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="date"
+              value={currentFilters.submittedOnFrom}
+              onChange={(e) => handleFilterChange("submittedOnFrom", e.target.value)}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Submitted To</label>
+          <div className="relative">
+            <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="date"
+              value={currentFilters.submittedOnTo}
+              onChange={(e) => handleFilterChange("submittedOnTo", e.target.value)}
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
         </div>
       </div>
 

@@ -94,10 +94,15 @@ export interface Stats {
 }
 
 export interface FilterState {
+  requestId: string
+  company: string
+  branch: string
   status: string
+  submittedOnFrom: string
+  submittedOnTo: string
+  // Legacy fields (keeping for compatibility)
   dateRange: string
   amount: string
-  branch: string
 }
 
 export interface ApiResponse<T = unknown> {
@@ -197,9 +202,31 @@ export interface GLCodingEntry {
 export interface DictionaryAccount {
   accountCode: string;
   accountCombined: string;
+  accountDescription: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdDate?: Date | null;
+  modifiedDate?: Date | null;
 }
 
 export interface DictionaryFacility {
   facilityCode: string;
   facilityCombined: string;
+  facilityDescription: string;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdDate?: Date | null;
+  modifiedDate?: Date | null;
+}
+
+export interface DictionaryApprover {
+  empId: string;
+  empName: string;
+  email: string;
+  amountLimit: number;
+  isActive: boolean;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+  createdDate?: Date | null;
+  modifiedDate?: Date | null;
 }

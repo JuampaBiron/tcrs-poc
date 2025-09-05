@@ -78,6 +78,7 @@ export async function GET(request: NextRequest) {
       amount: req.amount || '0',
       currency: req.currency || '',
       approverStatus: req.approverStatus || REQUEST_STATUS.PENDING,
+      assignedApprover: req.assignedApprover || 'Not Assigned',
       approvedDate: req.approvedDate,
       glCodingCount: req.glCodingCount || 0
     }))

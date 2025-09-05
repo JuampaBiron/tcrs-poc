@@ -11,7 +11,7 @@ import {
   generateExportFilename,
 } from "@/lib/api-client";
 import { FilterState, Stats } from "@/types";
-import { USER_ROLES } from "@/constants";
+import { USER_ROLES, REQUEST_STATUS } from "@/constants";
 
 // Type derivation from constants
 type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
@@ -27,10 +27,15 @@ export default function DashboardPage() {
   const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
   const [filters, setFilters] = useState<FilterState>({
-    status: "",
+    requestId: "",
+    company: "",
+    branch: "",
+    status: REQUEST_STATUS.PENDING,
+    submittedOnFrom: "",
+    submittedOnTo: "",
+    // Legacy fields (keeping for compatibility)
     dateRange: "",
     amount: "",
-    branch: "",
   });
   const [exportLoading, setExportLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,20 +50,69 @@ export default function DashboardPage() {
     userEmail: userEmail,
   });
 
+  // Extract unique values for dropdown filters
+  const uniqueCompanies = useMemo(() => {
+    if (!requests) return [];
+    const companies = [...new Set(
+      requests
+        .map(r => r.company)
+        .filter((company): company is string => Boolean(company))
+    )];
+    return companies.map(company => ({ value: company, label: company }));
+  }, [requests]);
+
+  const uniqueBranches = useMemo(() => {
+    if (!requests) return [];
+    const branches = [...new Set(
+      requests
+        .map(r => r.branch)
+        .filter((branch): branch is string => Boolean(branch))
+    )];
+    return branches.map(branch => ({ value: branch, label: branch }));
+  }, [requests]);
+
   // Filtered requests calculation
   const filteredRequests = useMemo(() => {
     if (!requests) return [];
     
     return requests.filter(request => {
+      // Search query filter
       const matchesSearch = searchQuery ? 
         (request.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         (request.requester?.toLowerCase() || '').includes(searchQuery.toLowerCase())) : true;
+         (request.requester?.toLowerCase() || '').includes(searchQuery.toLowerCase()) ||
+         (request.requestId?.toLowerCase() || '').includes(searchQuery.toLowerCase())) : true;
       
-      const matchesStatus = filters.status ? request.status === filters.status : true;
+      // Request ID filter
+      const matchesRequestId = filters.requestId ? 
+        (request.requestId?.toLowerCase() || '').includes(filters.requestId.toLowerCase()) : true;
+      
+      // Company filter
+      const matchesCompany = filters.company ? request.company === filters.company : true;
+      
+      // Branch filter
       const matchesBranch = filters.branch ? request.branch === filters.branch : true;
       
+      // Status filter
+      const matchesStatus = filters.status ? request.status === filters.status : true;
+      
+      // Date range filter (submitted on)
+      const matchesDateRange = (() => {
+        if (!filters.submittedOnFrom && !filters.submittedOnTo) return true;
+        
+        const requestDate = new Date(request.createdDate || request.submittedOn);
+        const fromDate = filters.submittedOnFrom ? new Date(filters.submittedOnFrom) : null;
+        const toDate = filters.submittedOnTo ? new Date(filters.submittedOnTo + 'T23:59:59') : null;
+        
+        if (fromDate && requestDate < fromDate) return false;
+        if (toDate && requestDate > toDate) return false;
+        
+        return true;
+      })();
+      
+      // Legacy amount filter (keeping for compatibility)
       const matchesAmount = filters.amount ? (() => {
-        const amountMatch = request.title.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i);
+        const amountMatch = request.title?.match(/\$([0-9,]+(?:\.[0-9]{2})?)/i) || 
+                           request.amount?.match(/\$?([0-9,]+(?:\.[0-9]{2})?)/i);
         const amount = amountMatch ? 
           parseFloat(amountMatch[1].replace(/,/g, '')) : 0;
         
@@ -70,7 +124,8 @@ export default function DashboardPage() {
         }
       })() : true;
       
-      return matchesSearch && matchesStatus && matchesBranch && matchesAmount;
+      return matchesSearch && matchesRequestId && matchesCompany && 
+             matchesBranch && matchesStatus && matchesDateRange && matchesAmount;
     });
   }, [requests, searchQuery, filters]);
 
@@ -85,10 +140,15 @@ export default function DashboardPage() {
 
   const handleClearFilters = () => {
     setFilters({
-      status: "",
+      requestId: "",
+      company: "",
+      branch: "",
+      status: REQUEST_STATUS.PENDING, // Reset to default pending status
+      submittedOnFrom: "",
+      submittedOnTo: "",
+      // Legacy fields (keeping for compatibility)
       dateRange: "",
       amount: "",
-      branch: "",
     });
     setSearchQuery("");
   };
@@ -200,6 +260,8 @@ export default function DashboardPage() {
           requestsCount={filteredRequests?.length || 0}
           totalRequestsCount={requests?.length || 0}
           currentFilters={filters}
+          uniqueCompanies={uniqueCompanies}
+          uniqueBranches={uniqueBranches}
         />
 
         {/* Requests Table - For all roles */}

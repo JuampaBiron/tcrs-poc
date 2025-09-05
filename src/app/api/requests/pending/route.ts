@@ -107,7 +107,8 @@ export async function GET(request: NextRequest) {
       vendor: dbRequest.vendor || 'Unknown',
       po: dbRequest.po || '',
       status: dbRequest.approverStatus || REQUEST_STATUS.PENDING,
-      priority: 'medium' as const
+      priority: 'medium' as const,
+      blobUrl: dbRequest.blobUrl
     }));
 
     console.log(`🎉 [API] Returning ${transformedRequests.length} transformed pending requests`);

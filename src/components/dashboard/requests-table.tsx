@@ -169,10 +169,10 @@ export default function RequestsTable({
                   {getSortIcon('submittedOn')}
                 </div>
               </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('glCodingCount')}>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('assignedApprover')}>
                 <div className="flex items-center">
-                  GL Coding Count
-                  {getSortIcon('glCodingCount')}
+                  Assigned Approver
+                  {getSortIcon('assignedApprover')}
                 </div>
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => handleSort('status')}>
@@ -203,7 +203,7 @@ export default function RequestsTable({
                 <td className="px-6 py-4 text-sm text-gray-900">{request.amount || '0'}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">{request.currency || 'N/A'}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">{request.submittedOn}</td>
-                <td className="px-6 py-4 text-sm text-gray-900">{request.glCodingCount || 0}</td>
+                <td className="px-6 py-4 text-sm text-gray-900">{request.assignedApprover || 'Not Assigned'}</td>
                 <td className="px-6 py-4">
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(request.status)}`}>
                     {getStatusText(request.status)}
